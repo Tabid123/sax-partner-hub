@@ -14,12 +14,16 @@ import { Route as DownloadAppRouteImport } from './routes/download-app'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as LandingRouteImport } from './routes/landing'
 import { Route as NotificationsRouteImport } from './routes/notifications'
+import { Route as OfflineModeRouteImport } from './routes/offline-mode'
 import { Route as PaymentSuccessRouteImport } from './routes/payment-success'
 import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ProvidersRouteImport } from './routes/providers'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminLoginRouteImport } from './routes/admin/login'
+import { Route as CategoriesProviderRouteImport } from './routes/categories/$provider'
+import { Route as PackagesProviderRouteImport } from './routes/packages/$provider'
+import { Route as PaymentProviderRouteImport } from './routes/payment/$provider'
 import { Route as ResellerIndexRouteImport } from './routes/reseller/index'
 import { Route as ResellerLoginRouteImport } from './routes/reseller/login'
 import { Route as SuperadminIndexRouteImport } from './routes/superadmin/index'
@@ -48,6 +52,11 @@ const LandingRoute = LandingRouteImport.update({
 const NotificationsRoute = NotificationsRouteImport.update({
   id: '/notifications',
   path: '/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OfflineModeRoute = OfflineModeRouteImport.update({
+  id: '/offline-mode',
+  path: '/offline-mode',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PaymentSuccessRoute = PaymentSuccessRouteImport.update({
@@ -80,6 +89,21 @@ const AdminLoginRoute = AdminLoginRouteImport.update({
   path: '/admin/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CategoriesProviderRoute = CategoriesProviderRouteImport.update({
+  id: '/categories/$provider',
+  path: '/categories/$provider',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PackagesProviderRoute = PackagesProviderRouteImport.update({
+  id: '/packages/$provider',
+  path: '/packages/$provider',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentProviderRoute = PaymentProviderRouteImport.update({
+  id: '/payment/$provider',
+  path: '/payment/$provider',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResellerIndexRoute = ResellerIndexRouteImport.update({
   id: '/reseller/',
   path: '/reseller/',
@@ -107,11 +131,15 @@ export interface FileRoutesByFullPath {
   '/history': typeof HistoryRoute
   '/landing': typeof LandingRoute
   '/notifications': typeof NotificationsRoute
+  '/offline-mode': typeof OfflineModeRoute
   '/payment-success': typeof PaymentSuccessRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/profile': typeof ProfileRoute
   '/providers': typeof ProvidersRoute
   '/admin/login': typeof AdminLoginRoute
+  '/categories/$provider': typeof CategoriesProviderRoute
+  '/packages/$provider': typeof PackagesProviderRoute
+  '/payment/$provider': typeof PaymentProviderRoute
   '/reseller/login': typeof ResellerLoginRoute
   '/superadmin/login': typeof SuperadminLoginRoute
   '/admin/': typeof AdminIndexRoute
@@ -124,11 +152,15 @@ export interface FileRoutesByTo {
   '/history': typeof HistoryRoute
   '/landing': typeof LandingRoute
   '/notifications': typeof NotificationsRoute
+  '/offline-mode': typeof OfflineModeRoute
   '/payment-success': typeof PaymentSuccessRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/profile': typeof ProfileRoute
   '/providers': typeof ProvidersRoute
   '/admin/login': typeof AdminLoginRoute
+  '/categories/$provider': typeof CategoriesProviderRoute
+  '/packages/$provider': typeof PackagesProviderRoute
+  '/payment/$provider': typeof PaymentProviderRoute
   '/reseller/login': typeof ResellerLoginRoute
   '/superadmin/login': typeof SuperadminLoginRoute
   '/admin': typeof AdminIndexRoute
@@ -142,11 +174,15 @@ export interface FileRoutesById {
   '/history': typeof HistoryRoute
   '/landing': typeof LandingRoute
   '/notifications': typeof NotificationsRoute
+  '/offline-mode': typeof OfflineModeRoute
   '/payment-success': typeof PaymentSuccessRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/profile': typeof ProfileRoute
   '/providers': typeof ProvidersRoute
   '/admin/login': typeof AdminLoginRoute
+  '/categories/$provider': typeof CategoriesProviderRoute
+  '/packages/$provider': typeof PackagesProviderRoute
+  '/payment/$provider': typeof PaymentProviderRoute
   '/reseller/login': typeof ResellerLoginRoute
   '/superadmin/login': typeof SuperadminLoginRoute
   '/admin/': typeof AdminIndexRoute
@@ -161,11 +197,15 @@ export interface FileRouteTypes {
     | '/history'
     | '/landing'
     | '/notifications'
+    | '/offline-mode'
     | '/payment-success'
     | '/privacy-policy'
     | '/profile'
     | '/providers'
     | '/admin/login'
+    | '/categories/$provider'
+    | '/packages/$provider'
+    | '/payment/$provider'
     | '/reseller/login'
     | '/superadmin/login'
     | '/admin/'
@@ -178,11 +218,15 @@ export interface FileRouteTypes {
     | '/history'
     | '/landing'
     | '/notifications'
+    | '/offline-mode'
     | '/payment-success'
     | '/privacy-policy'
     | '/profile'
     | '/providers'
     | '/admin/login'
+    | '/categories/$provider'
+    | '/packages/$provider'
+    | '/payment/$provider'
     | '/reseller/login'
     | '/superadmin/login'
     | '/admin'
@@ -195,11 +239,15 @@ export interface FileRouteTypes {
     | '/history'
     | '/landing'
     | '/notifications'
+    | '/offline-mode'
     | '/payment-success'
     | '/privacy-policy'
     | '/profile'
     | '/providers'
     | '/admin/login'
+    | '/categories/$provider'
+    | '/packages/$provider'
+    | '/payment/$provider'
     | '/reseller/login'
     | '/superadmin/login'
     | '/admin/'
@@ -213,11 +261,15 @@ export interface RootRouteChildren {
   HistoryRoute: typeof HistoryRoute
   LandingRoute: typeof LandingRoute
   NotificationsRoute: typeof NotificationsRoute
+  OfflineModeRoute: typeof OfflineModeRoute
   PaymentSuccessRoute: typeof PaymentSuccessRoute
   PrivacyPolicyRoute: typeof PrivacyPolicyRoute
   ProfileRoute: typeof ProfileRoute
   ProvidersRoute: typeof ProvidersRoute
   AdminLoginRoute: typeof AdminLoginRoute
+  CategoriesProviderRoute: typeof CategoriesProviderRoute
+  PackagesProviderRoute: typeof PackagesProviderRoute
+  PaymentProviderRoute: typeof PaymentProviderRoute
   ResellerLoginRoute: typeof ResellerLoginRoute
   SuperadminLoginRoute: typeof SuperadminLoginRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -262,6 +314,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/offline-mode': {
+      id: '/offline-mode'
+      path: '/offline-mode'
+      fullPath: '/offline-mode'
+      preLoaderRoute: typeof OfflineModeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/payment-success': {
       id: '/payment-success'
       path: '/payment-success'
@@ -304,6 +363,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/categories/$provider': {
+      id: '/categories/$provider'
+      path: '/categories/$provider'
+      fullPath: '/categories/$provider'
+      preLoaderRoute: typeof CategoriesProviderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/packages/$provider': {
+      id: '/packages/$provider'
+      path: '/packages/$provider'
+      fullPath: '/packages/$provider'
+      preLoaderRoute: typeof PackagesProviderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payment/$provider': {
+      id: '/payment/$provider'
+      path: '/payment/$provider'
+      fullPath: '/payment/$provider'
+      preLoaderRoute: typeof PaymentProviderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reseller/': {
       id: '/reseller/'
       path: '/reseller'
@@ -341,11 +421,15 @@ const rootRouteChildren: RootRouteChildren = {
   HistoryRoute: HistoryRoute,
   LandingRoute: LandingRoute,
   NotificationsRoute: NotificationsRoute,
+  OfflineModeRoute: OfflineModeRoute,
   PaymentSuccessRoute: PaymentSuccessRoute,
   PrivacyPolicyRoute: PrivacyPolicyRoute,
   ProfileRoute: ProfileRoute,
   ProvidersRoute: ProvidersRoute,
   AdminLoginRoute: AdminLoginRoute,
+  CategoriesProviderRoute: CategoriesProviderRoute,
+  PackagesProviderRoute: PackagesProviderRoute,
+  PaymentProviderRoute: PaymentProviderRoute,
   ResellerLoginRoute: ResellerLoginRoute,
   SuperadminLoginRoute: SuperadminLoginRoute,
   AdminIndexRoute: AdminIndexRoute,
