@@ -37,6 +37,7 @@ const normalizeSomaliPhone = (phone?: string | null) => (phone || '').replace(/^
 const OrderHistory = () => {
   const navigate = useNavigate();
   const { primary } = useBrand();
+  const { currentTenantId } = useTenant();
   const {
     toast
   } = useToast();
