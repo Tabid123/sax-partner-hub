@@ -126,8 +126,11 @@ export default function WholesaleTiersManager() {
       ...(tenantId ? { tenant_id: tenantId } : {}),
     };
 
+    const scoped = <T extends { eq: (c: string, v: string) => T }>(q: T) =>
+      tenantId ? q.eq('tenant_id', tenantId) : q;
+
     const res = editingId
-      ? await supabase.from('provider_wholesale_tiers').update(payload).eq('id', editingId)
+      ? await scoped(supabase.from('provider_wholesale_tiers').update(payload).eq('id', editingId) as any)
       : await supabase.from('provider_wholesale_tiers').insert(payload);
 
     if (res.error) return toast({ title: 'Khalad', description: res.error.message, variant: 'destructive' });
@@ -137,18 +140,23 @@ export default function WholesaleTiersManager() {
   };
 
   const remove = async (id: string) => {
-    const { error } = await supabase.from('provider_wholesale_tiers').delete().eq('id', id);
+    let q = supabase.from('provider_wholesale_tiers').delete().eq('id', id);
+    if (tenantId) q = q.eq('tenant_id', tenantId);
+    const { error } = await q;
     if (error) return toast({ title: 'Khalad', description: error.message, variant: 'destructive' });
     toast({ title: 'Waa la tirtiray' });
     load();
   };
 
   const toggleActive = async (t: Tier) => {
-    const { error } = await supabase.from('provider_wholesale_tiers')
+    let q = supabase.from('provider_wholesale_tiers')
       .update({ is_active: !t.is_active }).eq('id', t.id);
+    if (tenantId) q = q.eq('tenant_id', tenantId);
+    const { error } = await q;
     if (error) return toast({ title: 'Khalad', description: error.message, variant: 'destructive' });
     load();
   };
+
 
   const providerName = (id: string) => providers.find(p => p.id === id)?.provider_name || '—';
   const filteredTiers = filterProvider === 'all' ? tiers : tiers.filter(t => t.provider_id === filterProvider);

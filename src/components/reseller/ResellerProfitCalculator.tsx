@@ -78,18 +78,32 @@ export default function ResellerProfitCalculator() {
   const [saving, setSaving] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
-    let pq = supabase.from('providers_config').select('id, provider_name').eq('is_active', true).order('display_order');
+    // Providers waa system-wide (tenant_id = NULL); tenant_providers ayaa go'aaminaya kuwa la shiday.
+    const pq = supabase
+      .from('providers_config')
+      .select('id, provider_name')
+      .is('tenant_id', null)
+      .eq('is_active', true)
+      .order('display_order');
     let tq = supabase
       .from('provider_wholesale_tiers')
       .select('id, provider_id, tier_name, min_amount, max_amount, profit_rate, intake_rate, payout_rate, is_active, display_order')
       .order('display_order')
       .order('min_amount');
     if (tenantId) {
-      pq = pq.eq('tenant_id', tenantId);
       tq = tq.eq('tenant_id', tenantId);
     }
-    const [{ data: pr }, { data: tr }] = await Promise.all([pq, tq]);
-    setProviders((pr as Provider[]) || []);
+    const [{ data: pr }, { data: tr }, { data: links }] = await Promise.all([
+      pq,
+      tq,
+      tenantId
+        ? supabase.from('tenant_providers').select('provider_id, is_enabled').eq('tenant_id', tenantId)
+        : Promise.resolve({ data: null } as { data: { provider_id: string; is_enabled: boolean }[] | null }),
+    ]);
+    const catalog = (pr as Provider[]) || [];
+    const enabled = new Set((links || []).filter((l) => l.is_enabled).map((l) => l.provider_id));
+    setProviders(tenantId ? catalog.filter((p) => enabled.has(p.id)) : catalog);
+
     const list = (tr as Tier[]) || [];
     setTiers(list);
     setEdits((prev) => {
@@ -140,10 +154,13 @@ export default function ResellerProfitCalculator() {
     }
     setSaving((s) => ({ ...s, [t.id]: true }));
     const profit = profitPct(intake, payout);
-    const { error } = await supabase
+    let uq = supabase
       .from('provider_wholesale_tiers')
       .update({ intake_rate: intake, payout_rate: payout, profit_rate: profit })
       .eq('id', t.id);
+    if (tenantId) uq = uq.eq('tenant_id', tenantId);
+    const { error } = await uq;
+
     setSaving((s) => ({ ...s, [t.id]: false }));
     if (error) {
       toast({ title: so ? 'Khalad' : 'Error', description: error.message, variant: 'destructive' });

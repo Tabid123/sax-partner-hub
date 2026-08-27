@@ -1924,7 +1924,7 @@ export type Database = {
           payout_rate: number
           profit_rate: number
           provider_id: string
-          tenant_id: string | null
+          tenant_id: string
           tier_name: string
           updated_at: string
         }
@@ -1939,7 +1939,7 @@ export type Database = {
           payout_rate?: number
           profit_rate: number
           provider_id: string
-          tenant_id?: string | null
+          tenant_id?: string
           tier_name?: string
           updated_at?: string
         }
@@ -1954,7 +1954,7 @@ export type Database = {
           payout_rate?: number
           profit_rate?: number
           provider_id?: string
-          tenant_id?: string | null
+          tenant_id?: string
           tier_name?: string
           updated_at?: string
         }
@@ -3201,7 +3201,7 @@ export type Database = {
           payout_rate: number
           profit_rate: number
           provider_id: string
-          tenant_id: string | null
+          tenant_id: string
           tier_name: string
           updated_at: string
         }[]
