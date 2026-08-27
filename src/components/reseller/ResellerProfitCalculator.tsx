@@ -154,10 +154,13 @@ export default function ResellerProfitCalculator() {
     }
     setSaving((s) => ({ ...s, [t.id]: true }));
     const profit = profitPct(intake, payout);
-    const { error } = await supabase
+    let uq = supabase
       .from('provider_wholesale_tiers')
       .update({ intake_rate: intake, payout_rate: payout, profit_rate: profit })
       .eq('id', t.id);
+    if (tenantId) uq = uq.eq('tenant_id', tenantId);
+    const { error } = await uq;
+
     setSaving((s) => ({ ...s, [t.id]: false }));
     if (error) {
       toast({ title: so ? 'Khalad' : 'Error', description: error.message, variant: 'destructive' });
