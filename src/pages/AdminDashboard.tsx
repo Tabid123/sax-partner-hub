@@ -1307,6 +1307,7 @@ const AdminDashboard = () => {
                 {/* Providers Tab */}
                 {activeTab === 'providers' && (
                   <TabsContent value="providers" className="space-y-6">
+                    <TenantProvidersManager />
                     <Card>
                       <CardHeader><CardTitle>{language === 'so' ? 'Ku dar Shirkad Cusub' : 'Add Provider'}</CardTitle></CardHeader>
                       <CardContent className="space-y-4">
