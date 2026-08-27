@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useConnectivity } from '@/contexts/ConnectivityContext';
+import { useTenant } from '@/contexts/TenantContext';
 
 const QUEUE_KEY = 'iftin_pending_intents_queue';
 const MAX_ATTEMPTS = 5;
@@ -18,6 +19,7 @@ interface QueuedIntent {
  */
 export function usePendingIntentSync() {
   const { isReallyOnline } = useConnectivity();
+  const { currentTenantId } = useTenant();
   const isSyncingRef = useRef(false);
 
   const sync = async () => {
@@ -47,7 +49,7 @@ export function usePendingIntentSync() {
         try {
           const { error } = await supabase
             .from('pending_online_payments')
-            .insert([item.data as any]);
+            .insert([{ ...(item.data as any), tenant_id: (item.data as any).tenant_id || currentTenantId || null }]);
           if (!error) {
             successfulIds.push(item.id);
             console.log('✅ Synced queued intent:', item.id);
