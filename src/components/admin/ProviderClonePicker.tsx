@@ -19,19 +19,46 @@ export default function ProviderClonePicker({ tenantId, selected, onChange }: Pr
     let active = true;
     (async () => {
       setLoading(true);
-      const { data, error } = await supabase.functions.invoke("superadmin-tenants", {
-        body: { action: "source_providers", tenant_id: tenantId ?? null },
-      });
+      // Catalog is system-wide (tenant_id IS NULL); a tenant only toggles it on.
+      const [{ data: provs }, { data: tp }] = await Promise.all([
+        supabase
+          .from("providers_config")
+          .select("provider_name, display_order")
+          .is("tenant_id", null)
+          .order("display_order", { ascending: true }),
+        tenantId
+          ? supabase
+              .from("tenant_providers")
+              .select("is_enabled, providers_config(provider_name)")
+              .eq("tenant_id", tenantId)
+              .eq("is_enabled", true)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
       if (!active) return;
       setLoading(false);
-      if (error || data?.error) return;
-      setProviders(data.providers ?? []);
-      setExisting((data.existing ?? []).map((n: string) => n.toLowerCase()));
+      const seen = new Set<string>();
+      setProviders(
+        (provs ?? [])
+          .map((p: any) => p.provider_name as string)
+          .filter((n) => {
+            const k = (n ?? "").toLowerCase();
+            if (!k || seen.has(k)) return false;
+            seen.add(k);
+            return true;
+          }),
+      );
+      setExisting(
+        (tp ?? [])
+          .map((r: any) => r.providers_config?.provider_name)
+          .filter(Boolean)
+          .map((n: string) => n.toLowerCase()),
+      );
     })();
     return () => {
       active = false;
     };
   }, [tenantId]);
+
 
   const toggle = (name: string) => {
     onChange(selected.includes(name) ? selected.filter((n) => n !== name) : [...selected, name]);
