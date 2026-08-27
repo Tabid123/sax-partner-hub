@@ -34,6 +34,7 @@ const PhoneVerification = ({ isOpen, onClose, onSuccess, paymentProvider, packag
   const [providerLogo, setProviderLogo] = useState('');
   const [showPrefixError, setShowPrefixError] = useState(false);
   const { toast } = useToast();
+  const { currentTenantId } = useTenant();
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;

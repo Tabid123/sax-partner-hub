@@ -57,7 +57,7 @@ export function useNotifications() {
           table: 'notifications'
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['user-notifications'] });
+          queryClient.invalidateQueries({ queryKey: ['user-notifications', currentTenantId] });
         }
       )
       .subscribe();
@@ -65,7 +65,7 @@ export function useNotifications() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [queryClient, currentTenantId]);
 
   // Calculate unread count
   const unreadCount = notifications?.filter((notif) => {
