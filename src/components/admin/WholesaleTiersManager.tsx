@@ -55,17 +55,31 @@ export default function WholesaleTiersManager() {
 
   const load = async () => {
     setLoading(true);
-    let providerQuery = supabase.from('providers_config').select('id, provider_name').eq('is_active', true).order('display_order');
+    // Providers-ku waa system-wide (tenant_id = NULL); tenant_providers ayaa go'aaminaya kuwa la shiday.
+    const catalogQuery = supabase
+      .from('providers_config')
+      .select('id, provider_name')
+      .is('tenant_id', null)
+      .eq('is_active', true)
+      .order('display_order');
     let tierQuery = supabase.from('provider_wholesale_tiers').select('*').order('display_order').order('min_amount');
-    if (tenantId) {
-      providerQuery = providerQuery.eq('tenant_id', tenantId);
-      tierQuery = tierQuery.eq('tenant_id', tenantId);
-    }
-    const [{ data: pr }, { data: tr }] = await Promise.all([providerQuery, tierQuery]);
-    setProviders(pr || []);
+    if (tenantId) tierQuery = tierQuery.eq('tenant_id', tenantId);
+
+    const [{ data: pr }, { data: tr }, { data: links }] = await Promise.all([
+      catalogQuery,
+      tierQuery,
+      tenantId
+        ? supabase.from('tenant_providers').select('provider_id, is_enabled').eq('tenant_id', tenantId)
+        : Promise.resolve({ data: null } as { data: { provider_id: string; is_enabled: boolean }[] | null }),
+    ]);
+
+    const catalog = (pr || []) as Provider[];
+    const enabled = new Set((links || []).filter((l) => l.is_enabled).map((l) => l.provider_id));
+    setProviders(tenantId ? catalog.filter((p) => enabled.has(p.id)) : catalog);
     setTiers((tr as Tier[]) || []);
     setLoading(false);
   };
+
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [tenantId]);
 
