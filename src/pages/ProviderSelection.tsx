@@ -1,0 +1,570 @@
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useNavigate } from "@/lib/router-compat";
+import {
+  Bell,
+  User,
+  Search,
+  WifiOff,
+  RefreshCw,
+  Phone,
+  MessageCircle,
+  X,
+} from 'lucide-react';
+import { JumloFlow } from '@/components/JumloFlow';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { toast } from '@/hooks/use-toast';
+import { BottomNavigation } from '@/components/BottomNavigation';
+import { showBannerAd, hideBannerAd } from '@/services/admob';
+import { logScreenView } from '@/services/firebase';
+import { useConnectivity } from '@/contexts/ConnectivityContext';
+import { useBrand } from '@/hooks/useBrand';
+import { useTenant } from '@/contexts/TenantContext';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+
+interface Provider {
+  id: string;
+  provider_name: string;
+  provider_logo: string | null;
+  is_active: boolean;
+}
+
+// Brand colors per spec
+const PROVIDER_COLORS: Record<string, { bg: string; ring: string }> = {
+  hormuud: { bg: '#1a8a2e', ring: '#1a8a2e' },
+  somtel:  { bg: '#e6a800', ring: '#e6a800' },
+  somlink: { bg: '#cc2200', ring: '#cc2200' },
+  somnet:  { bg: '#0055cc', ring: '#0055cc' },
+  amtel:   { bg: '#8800cc', ring: '#8800cc' },
+};
+
+const getProviderColor = (name: string) => {
+  const key = name?.toLowerCase().trim();
+  return PROVIDER_COLORS[key] || { bg: '#0066CC', ring: '#0066CC' };
+};
+
+const getInitials = (name: string) => {
+  if (!name) return '?';
+  const clean = name.trim().toUpperCase();
+  return clean.slice(0, 3);
+};
+
+// Detect provider id from receiver prefix (kept from old logic)
+const detectProvider = (phone: string): { id: string; name: string } | null => {
+  if (phone.length < 2) return null;
+  const prefix = phone.substring(0, 2);
+  const map: Record<string, { id: string; name: string }> = {
+    '61': { id: 'hormuud', name: 'Hormuud' },
+    '68': { id: 'somnet', name: 'Somnet' },
+    '62': { id: 'somtel', name: 'Somtel' },
+    '71': { id: 'amtel', name: 'Amtel' },
+    '64': { id: 'somlink', name: 'Somlink' },
+  };
+  return map[prefix] || null;
+};
+
+// Format raw digits as "61 XXX XXXX"
+const formatPhoneDisplay = (digits: string) => {
+  const d = digits.replace(/\D/g, '').slice(0, 9);
+  if (d.length <= 2) return d;
+  if (d.length <= 5) return `${d.slice(0, 2)} ${d.slice(2)}`;
+  return `${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5)}`;
+};
+
+const ProviderSelection = () => {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { isReallyOnline } = useConnectivity();
+  const { tenant, loading: tenantLoading } = useTenant();
+  const tenantId = tenant?.id ?? null;
+  const providerCacheKey = tenantId ? `offline_providers:${tenantId}` : null;
+
+  const [search, setSearch] = useState('');
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const [jumloOpen, setJumloOpen] = useState(false);
+
+  const [showOfflineToast, setShowOfflineToast] = useState(false);
+  const [showContactSheet, setShowContactSheet] = useState(false);
+
+  // Pull-to-refresh
+  const [isPulling, setIsPulling] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const startY = useRef(0);
+  const PULL_THRESHOLD = 80;
+
+  useEffect(() => {
+    showBannerAd();
+    logScreenView('ProviderSelection');
+    return () => { hideBannerAd(); };
+  }, []);
+
+  // Realtime providers
+  useEffect(() => {
+    const channel: RealtimeChannel = supabase
+      .channel('providers-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'providers_config' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['providers'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
+
+  const { data: providers = [] } = useQuery<Provider[]>({
+    queryKey: ['providers', tenantId],
+    queryFn: async () => {
+      if (isReallyOnline === false) {
+        const cached = providerCacheKey ? localStorage.getItem(providerCacheKey) : null;
+        return cached ? JSON.parse(cached) : [];
+      }
+      const { data, error } = await supabase.rpc('get_active_providers', { p_tenant_id: tenantId });
+      if (error) throw error;
+      if (providerCacheKey) localStorage.setItem(providerCacheKey, JSON.stringify(data || []));
+      return data || [];
+    },
+    enabled: !tenantLoading && !!tenantId,
+    staleTime: 30 * 1000,
+    refetchOnMount: 'always',
+    retry: false,
+  });
+
+
+  // Prefetch categories + per-provider packages (preserved)
+  const { data: providerRates = {} } = useQuery<Record<string, number>>({
+    queryKey: ['provider-top-rates', tenantId, providers.map((p: any) => p.id).join(',')],
+    queryFn: async () => {
+      const map: Record<string, number> = {};
+      await Promise.all(
+        providers.map(async (p: any) => {
+          const { data, error } = await supabase.rpc('get_provider_wholesale_tiers', {
+            provider_uuid: p.id,
+            p_tenant_id: tenantId,
+          });
+          if (error) return;
+          const tiers = (data || []).filter((t: any) => t.is_active !== false);
+          if (!tiers.length) return;
+          // Tier-ka 1-aad (display_order ugu hooseeya, kadib min_amount)
+          const first = [...tiers].sort(
+            (a: any, b: any) =>
+              (a.display_order ?? 0) - (b.display_order ?? 0) ||
+              Number(a.min_amount) - Number(b.min_amount),
+          )[0];
+          const rate = Number(first.payout_rate ?? first.profit_rate) || 0;
+          if (rate > 0) map[p.id] = rate;
+        }),
+      );
+      return map;
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+    enabled: !tenantLoading && !!tenantId && providers.length > 0,
+  });
+
+
+  useEffect(() => {
+    if (!providers.length) return;
+    queryClient.prefetchQuery({
+      queryKey: ['categories'],
+      queryFn: async () => {
+        const { data, error } = await supabase.rpc('get_active_categories', { p_tenant_id: tenantId });
+        if (error) throw error;
+        return data || [];
+      },
+      staleTime: 30 * 1000,
+    });
+    providers.forEach((p) => {
+      queryClient.prefetchQuery({
+        queryKey: ['packages', p.id],
+        queryFn: async () => {
+          const { data, error } = await supabase.rpc('get_public_packages', { provider_uuid: p.id, p_tenant_id: tenantId });
+          if (error) throw error;
+          return data || [];
+        },
+        staleTime: 30 * 1000,
+      });
+      queryClient.prefetchQuery({
+        queryKey: ['promotionalText', p.id],
+        queryFn: async () => {
+          const { data, error } = await supabase
+            .from('providers_config')
+            .select('promotional_text')
+            .eq('id', p.id)
+            .maybeSingle();
+          if (error) throw error;
+          return data?.promotional_text || 'Iftin ka iibso Internet adigoona qof wicin, waqti kasta, xitaa offline!';
+        },
+        staleTime: 30 * 1000,
+      });
+      // Tiers-ka Jumlo horay u soo qabo si sheet-ku isla markiiba u muuqdo
+      queryClient.prefetchQuery({
+        queryKey: ['wholesaleTiers', p.id, tenantId],
+        queryFn: async () => {
+          const { data, error } = await supabase.rpc('get_provider_wholesale_tiers', { provider_uuid: p.id, p_tenant_id: tenantId });
+          if (error) throw error;
+          return data || [];
+        },
+        staleTime: 60_000,
+      });
+    });
+    queryClient.prefetchQuery({
+      queryKey: ['jumloPaymentMethods', tenantId],
+      queryFn: async () => {
+        const { data, error } = await supabase.rpc('get_active_payment_providers', { p_tenant_id: tenantId });
+        if (error) throw error;
+        return data || [];
+      },
+      staleTime: 30_000,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [providers, tenantId]);
+
+  // (auto-detect by phone removed — user picks provider directly to open Jumlo flow)
+
+  // Pull to refresh handlers
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: ['providers', tenantId] });
+      await queryClient.invalidateQueries({ queryKey: ['featuredPackages'] });
+      await queryClient.invalidateQueries({ queryKey: ['banners'] });
+    } finally {
+      setIsRefreshing(false);
+      setPullDistance(0);
+    }
+  }, [queryClient, tenantId]);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (contentRef.current && contentRef.current.scrollTop === 0) {
+      startY.current = e.touches[0].clientY;
+      setIsPulling(true);
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isPulling || isRefreshing) return;
+    const currentY = e.touches[0].clientY;
+    const distance = Math.max(0, currentY - startY.current);
+    if (distance > 0 && contentRef.current?.scrollTop === 0) {
+      setPullDistance(Math.min(distance * 0.5, PULL_THRESHOLD + 20));
+    }
+  }, [isPulling, isRefreshing]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (pullDistance >= PULL_THRESHOLD && !isRefreshing) handleRefresh();
+    else setPullDistance(0);
+    setIsPulling(false);
+  }, [pullDistance, isRefreshing, handleRefresh]);
+
+  const filteredProviders = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return providers;
+    return providers.filter((p) => p.provider_name.toLowerCase().includes(q));
+  }, [providers, search]);
+
+  const selectedProvider = useMemo(
+    () => providers.find((p) => p.id === selectedProviderId) || null,
+    [providers, selectedProviderId]
+  );
+
+  // Tenant (reseller) branding — falls back to default app brand
+  const { logoUrl, name: brandName, primary: brandColor } = useBrand();
+
+  if (tenantLoading || !tenantId) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <RefreshCw className="h-7 w-7 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const handleProviderSelect = (p: Provider) => {
+    if (isReallyOnline === false) {
+      setShowOfflineToast(true);
+      setTimeout(() => setShowOfflineToast(false), 3000);
+      return;
+    }
+    if ((p as any).out_of_balance) {
+      toast({
+        title: 'Balance ma heyno',
+        description: `${p.provider_name} hadda balance ma haysato. Fadlan mar kale isku day.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+    setSelectedProviderId(p.id);
+    setJumloOpen(true);
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col bg-[#f5f7fa]">
+      {/* HEADER */}
+      <div
+        className="fixed top-0 left-0 right-0 z-40"
+        style={{
+          backgroundColor: brandColor,
+          paddingTop: 'var(--effective-safe-area-top, 0px)',
+        }}
+      >
+        <div className="px-4 pt-3 pb-4 text-white">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2.5">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={`${brandName} logo`}
+                  className="h-10 w-10 shrink-0 rounded-xl object-cover"
+                />
+              ) : (
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20 text-lg font-extrabold">
+                  {brandName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0 leading-tight">
+                <h1 className="truncate text-lg font-extrabold tracking-tight">{brandName}</h1>
+                <p className="truncate text-[11px] font-medium text-white/70">Internet Marketplace</p>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2.5">
+              <button
+                aria-label="Notifications"
+                onClick={() => navigate('/notifications')}
+                className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition"
+              >
+                <Bell className="w-5 h-5 text-white" />
+              </button>
+              <button
+                aria-label="Profile"
+                onClick={() => navigate('/profile')}
+                className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition"
+              >
+                <User className="w-5 h-5 text-white" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* CONTENT */}
+      <div
+        ref={contentRef}
+        className="flex-1 overflow-y-auto"
+        style={{
+          paddingTop: 'calc(5.25rem + var(--effective-safe-area-top, 0px))',
+          paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))',
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Pull indicator */}
+        <div
+          className="flex items-center justify-center transition-all duration-200"
+          style={{
+            height: pullDistance > 0 ? `${pullDistance}px` : 0,
+            opacity: pullDistance > 20 ? 1 : 0,
+          }}
+        >
+          <RefreshCw
+            className={`w-5 h-5 text-[${brandColor}] ${isRefreshing ? 'animate-spin' : ''}`}
+            style={{ transform: `rotate(${pullDistance * 2}deg)`, color: brandColor }}
+          />
+        </div>
+
+        {/* OFFLINE TOAST */}
+        {showOfflineToast && (
+          <div className="mx-4 mt-2 p-3 bg-amber-100 border border-amber-500 rounded-xl flex items-start gap-2 animate-in slide-in-from-top">
+            <WifiOff className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-amber-800">Internet ma hayso!</p>
+              <p className="text-sm text-amber-700 mt-1">Fadlan isticmaal Offline Mode.</p>
+            </div>
+          </div>
+        )}
+
+        {/* BANNER */}
+        <div className="px-4 pt-4">
+          <div
+            className="relative overflow-hidden rounded-2xl text-white p-5 shadow-lg"
+            style={{
+              backgroundColor: brandColor,
+              minHeight: '140px',
+            }}
+          >
+            {/* Decorative circles */}
+            <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-white/10" />
+            <div className="absolute right-12 top-8 w-24 h-24 rounded-full bg-white/10" />
+            <div className="absolute -right-4 bottom-2 w-16 h-16 rounded-full bg-white/5" />
+
+            <div className="relative">
+              <span className="inline-block bg-white/25 backdrop-blur-sm text-white text-[11px] font-semibold px-3 py-1 rounded-full">
+                Cusub
+              </span>
+              <h2 className="mt-3 text-2xl font-extrabold leading-tight">
+                Xirmo Tayo Sare
+                <br />
+                Qiimo Jaban
+              </h2>
+              <p className="mt-1 text-white/85 text-sm font-medium">
+                Offline xitaa u shaqeeya
+              </p>
+
+              {/* Dots */}
+              <div className="mt-4 flex items-center gap-1.5">
+                <span className="block h-1.5 w-5 rounded-full bg-white" />
+                <span className="block h-1.5 w-1.5 rounded-full bg-white/50" />
+                <span className="block h-1.5 w-1.5 rounded-full bg-white/50" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* PROVIDERS */}
+        <div className="px-4 pt-5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-bold text-gray-900">Shirkadaha</h3>
+            <button
+              className="text-sm font-semibold"
+              style={{ color: brandColor }}
+              onClick={() => setSearch('')}
+            >
+              Dhammaan
+            </button>
+          </div>
+
+          <div className="mt-3 flex flex-col gap-2.5">
+            {filteredProviders.map((p) => {
+              const colors = getProviderColor(p.provider_name);
+              const isSelected = selectedProviderId === p.id;
+              const offline = isReallyOnline === false;
+              const rate = providerRates[p.id];
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => handleProviderSelect(p)}
+                  disabled={offline}
+                  className={`w-full flex items-center gap-3 rounded-2xl p-3 text-left transition-all ${
+                    isSelected
+                      ? 'bg-white ring-2'
+                      : 'bg-white ring-1'
+                  } ${offline ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  style={{
+                    boxShadow: `0 0 0 ${isSelected ? '3px' : '2px'} ${colors.ring}`,
+                  }}
+                >
+                  <div
+                    className="shrink-0 w-12 h-12 rounded-full overflow-hidden flex items-center justify-center text-white text-[11px] font-extrabold tracking-wide shadow-sm"
+                    style={{ backgroundColor: p.provider_logo ? '#fff' : colors.bg }}
+                  >
+                    {p.provider_logo ? (
+                      <img
+                        src={p.provider_logo}
+                        alt={`${p.provider_name} logo`}
+                        className="w-full h-full object-contain"
+                        loading="eager"
+                        decoding="async"
+                        onError={(e) => {
+                          const el = e.currentTarget;
+                          el.style.display = 'none';
+                          const parent = el.parentElement;
+                          if (parent) {
+                            parent.style.backgroundColor = colors.bg;
+                            parent.textContent = getInitials(p.provider_name);
+                          }
+                        }}
+                      />
+                    ) : (
+                      getInitials(p.provider_name)
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-gray-900 truncate">{p.provider_name}</p>
+                    <p className="text-xs text-gray-500 truncate">Internet &amp; Jumlo</p>
+                  </div>
+                  {rate !== undefined && (
+                    <div className="shrink-0 text-right">
+                      <p className="text-lg font-extrabold text-green-600 leading-none">{Number(rate).toFixed(2).replace(/\.00$/, '')}%</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">Rate</p>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+
+            {filteredProviders.length === 0 && (
+              <p className="text-sm text-gray-500 py-4">Shirkad lama helin.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="h-6" />
+      </div>
+
+      {/* Jumlo flow modal */}
+      {selectedProvider && (
+        <JumloFlow
+          open={jumloOpen}
+          onClose={() => setJumloOpen(false)}
+          providerId={selectedProvider.id}
+          providerName={selectedProvider.provider_name}
+          brandColor={getProviderColor(selectedProvider.provider_name).bg}
+        />
+      )}
+
+      {/* Floating Support FAB */}
+      <button
+        onClick={() => setShowContactSheet(!showContactSheet)}
+        className={`fixed bottom-24 right-4 z-40 w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-all duration-300 ${
+          showContactSheet ? 'bg-red-500' : ''
+        }`}
+        style={!showContactSheet ? { backgroundColor: brandColor } : undefined}
+      >
+        {showContactSheet ? (
+          <X className="w-7 h-7 text-white" />
+        ) : (
+          <>
+            <Phone className="w-7 h-7 text-white" />
+            <span
+              className="absolute -top-1 -right-1 bg-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center border-2"
+              style={{ color: brandColor, borderColor: brandColor }}
+            >
+              24
+            </span>
+          </>
+        )}
+      </button>
+
+      {showContactSheet && (
+        <div className="fixed bottom-40 right-4 z-40 flex flex-col items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <a
+            href="tel:+252617195659"
+            onClick={() => setShowContactSheet(false)}
+            className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+            style={{ backgroundColor: brandColor }}
+          >
+            <Phone className="w-7 h-7 text-white" />
+          </a>
+          <button
+            onClick={() => setShowContactSheet(false)}
+            className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition-colors"
+          >
+            <X className="w-4 h-4 text-white" />
+          </button>
+          <a
+            href="https://wa.link/ake9qi"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setShowContactSheet(false)}
+            className="w-14 h-14 bg-[#25D366] rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+          >
+            <MessageCircle className="w-7 h-7 text-white" />
+          </a>
+        </div>
+      )}
+
+      <BottomNavigation />
+    </div>
+  );
+};
+
+export default ProviderSelection;
