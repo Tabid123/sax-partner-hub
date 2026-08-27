@@ -576,6 +576,7 @@ const PaymentProviders = () => {
               p_package_id: packageData?.id,
               p_payment_provider: selectedPaymentProvider?.provider_name || '',
               p_expected_amount: parseFloat(amount),
+              p_tenant_id: tenantId,
             });
             if (!rpcErr && rpcData && (rpcData as any).success) {
               const id = (rpcData as any).intent_id as string;
