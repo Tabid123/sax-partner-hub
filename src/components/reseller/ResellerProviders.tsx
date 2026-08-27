@@ -22,25 +22,18 @@ interface ProviderRow {
   id: string;
   provider_name: string;
   provider_logo: string | null;
-  is_active: boolean;
-  payment_number: string | null;
   out_of_balance: boolean;
+  /** per-tenant */
+  is_enabled: boolean;
+  payment_number: string | null;
 }
 
 const ORDER = ['hormuud', 'somnet', 'somtel', 'amtel'];
 
-const DEFAULT_PROVIDERS = [
-  { provider_name: 'Hormuud', provider_logo: '/storage/logos/hormuud.jpg' },
-  { provider_name: 'Somnet', provider_logo: '/storage/logos/somnet.jpg' },
-  { provider_name: 'Somtel', provider_logo: '/storage/logos/somtel.png' },
-  { provider_name: 'Amtel', provider_logo: '/storage/logos/somlink.jpg' },
-];
-
-
-
 export default function ResellerProviders() {
   const { currentTenantId } = useTenant();
   const [items, setItems] = useState<ProviderRow[]>([]);
+  const [catalog, setCatalog] = useState<{ id: string; provider_name: string; provider_logo: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [numbers, setNumbers] = useState<Record<string, string>>({});
@@ -48,87 +41,123 @@ export default function ResellerProviders() {
   const [selected, setSelected] = useState<string[]>([]);
   const [customName, setCustomName] = useState('');
 
-
   const load = async () => {
     if (!currentTenantId) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from('providers_config')
-      .select('id, provider_name, provider_logo, is_active, payment_number, out_of_balance')
-      .eq('tenant_id', currentTenantId);
+
+    // Providers-ku waa system-wide; tenant_providers ayaa go'aaminaya kuwa la shiday.
+    const [{ data: providers, error: pErr }, { data: links, error: lErr }] = await Promise.all([
+      supabase
+        .from('providers_config')
+        .select('id, provider_name, provider_logo, out_of_balance, payment_number, display_order')
+        .eq('is_active', true),
+      supabase
+        .from('tenant_providers')
+        .select('provider_id, is_enabled, payment_number')
+        .eq('tenant_id', currentTenantId),
+    ]);
+
+    const error = pErr || lErr;
     if (error) toast({ title: 'Khalad', description: error.message, variant: 'destructive' });
-    const rows = ((data as ProviderRow[]) ?? []).sort((a, b) => {
-      const ia = ORDER.indexOf(a.provider_name?.toLowerCase());
-      const ib = ORDER.indexOf(b.provider_name?.toLowerCase());
-      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
-    });
+
+    const linkMap = new Map((links ?? []).map((l: any) => [l.provider_id, l]));
+    const all = (providers ?? []) as any[];
+
+    const rows: ProviderRow[] = all
+      .filter((p) => linkMap.has(p.id))
+      .map((p) => ({
+        id: p.id,
+        provider_name: p.provider_name,
+        provider_logo: p.provider_logo,
+        out_of_balance: !!p.out_of_balance,
+        is_enabled: !!linkMap.get(p.id)?.is_enabled,
+        payment_number: linkMap.get(p.id)?.payment_number ?? p.payment_number ?? null,
+      }))
+      .sort((a, b) => {
+        const ia = ORDER.indexOf(a.provider_name?.toLowerCase());
+        const ib = ORDER.indexOf(b.provider_name?.toLowerCase());
+        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+      });
+
     setItems(rows);
+    setCatalog(all.filter((p) => !linkMap.has(p.id)).map((p) => ({ id: p.id, provider_name: p.provider_name, provider_logo: p.provider_logo })));
     setNumbers(Object.fromEntries(rows.map((r) => [r.id, r.payment_number ?? ''])));
     setLoading(false);
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [currentTenantId]);
 
-  const patch = async (row: ProviderRow, changes: Partial<ProviderRow>, message: string) => {
+  /** Cusboonaysii xiriirka tenant ↔ provider. */
+  const patchLink = async (row: ProviderRow, changes: { is_enabled?: boolean; payment_number?: string | null }, message: string) => {
+    if (!currentTenantId) return;
     setSavingId(row.id);
     const { error } = await supabase
-      .from('providers_config')
+      .from('tenant_providers')
       .update(changes)
-      .eq('id', row.id)
-      .eq('tenant_id', currentTenantId);
+      .eq('tenant_id', currentTenantId)
+      .eq('provider_id', row.id);
     setSavingId(null);
     if (error) { toast({ title: 'Khalad', description: error.message, variant: 'destructive' }); return; }
-    setItems((prev) => prev.map((p) => (p.id === row.id ? { ...p, ...changes } : p)));
+    setItems((prev) => prev.map((p) => (p.id === row.id ? { ...p, ...changes } as ProviderRow : p)));
     toast({ title: 'Guul', description: message });
   };
 
-  const addProviders = async (names: { provider_name: string; provider_logo: string | null }[]) => {
-    if (!currentTenantId || names.length === 0) return;
-    setSavingId('add');
-    const existing = new Set(items.map((i) => i.provider_name?.toLowerCase().trim()));
-    const rows = names
-      .filter((d) => !existing.has(d.provider_name.toLowerCase().trim()))
-      .map((d, i) => ({
-        provider_name: d.provider_name.trim(),
-        provider_logo: d.provider_logo,
-        is_active: true,
-        display_order: items.length + i + 1,
-        tenant_id: currentTenantId,
-      }));
-    if (rows.length === 0) {
-      setSavingId(null);
-      toast({ title: 'Ogow', description: 'Shirkaddaas horey ayay u jirtay' });
-      return;
-    }
-    const { error } = await supabase.from('providers_config').insert(rows);
+  /** `out_of_balance` waa xog shirkadda shabakadda oo guud. */
+  const patchProvider = async (row: ProviderRow, value: boolean) => {
+    setSavingId(row.id);
+    const { error } = await supabase.from('providers_config').update({ out_of_balance: value }).eq('id', row.id);
     setSavingId(null);
     if (error) { toast({ title: 'Khalad', description: error.message, variant: 'destructive' }); return; }
-    toast({ title: 'Guul', description: `${rows.length} shirkadood ayaa lagu daray` });
+    setItems((prev) => prev.map((p) => (p.id === row.id ? { ...p, out_of_balance: value } : p)));
+    toast({ title: 'Guul', description: value ? 'Waa la calaamadiyay "Balance ma heyno"' : 'Balance-ka waa la celiyay' });
+  };
+
+  const addProviders = async (providerIds: string[], newName?: string) => {
+    if (!currentTenantId) return;
+    setSavingId('add');
+
+    const ids = [...providerIds];
+
+    // Magac cusub → ku dar liiska guud (haddii uusan horey u jirin), kadib u shid tenant-ka.
+    if (newName?.trim()) {
+      const name = newName.trim();
+      const { data: created, error: cErr } = await supabase
+        .from('providers_config')
+        .insert({ provider_name: name, is_active: true, display_order: 99 })
+        .select('id')
+        .single();
+      if (cErr) { setSavingId(null); toast({ title: 'Khalad', description: cErr.message, variant: 'destructive' }); return; }
+      ids.push(created.id);
+    }
+
+    if (ids.length === 0) { setSavingId(null); return; }
+
+    const { error } = await supabase
+      .from('tenant_providers')
+      .upsert(
+        ids.map((provider_id) => ({ tenant_id: currentTenantId, provider_id, is_enabled: true })),
+        { onConflict: 'tenant_id,provider_id' }
+      );
+    setSavingId(null);
+    if (error) { toast({ title: 'Khalad', description: error.message, variant: 'destructive' }); return; }
+
+    toast({ title: 'Guul', description: `${ids.length} shirkadood ayaa lagu daray` });
     setPickerOpen(false);
     setSelected([]);
     setCustomName('');
     load();
   };
 
-  const toggleSelected = (name: string) =>
-    setSelected((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]));
+  const toggleSelected = (id: string) =>
+    setSelected((prev) => (prev.includes(id) ? prev.filter((n) => n !== id) : [...prev, id]));
 
   const submitPicker = () => {
-    const chosen = DEFAULT_PROVIDERS.filter((d) => selected.includes(d.provider_name)).map((d) => ({
-      provider_name: d.provider_name,
-      provider_logo: d.provider_logo as string | null,
-    }));
-    if (customName.trim()) chosen.push({ provider_name: customName.trim(), provider_logo: null });
-    if (chosen.length === 0) {
+    if (selected.length === 0 && !customName.trim()) {
       toast({ title: 'Ogow', description: 'Fadlan dooro ama qor shirkad', variant: 'destructive' });
       return;
     }
-    addProviders(chosen);
+    addProviders(selected, customName);
   };
-
-  const availableDefaults = DEFAULT_PROVIDERS.filter(
-    (d) => !items.some((i) => i.provider_name?.toLowerCase().trim() === d.provider_name.toLowerCase())
-  );
 
   if (loading) {
     return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
@@ -167,20 +196,26 @@ export default function ResellerProviders() {
           </DialogHeader>
 
           <div className="space-y-3">
-            {availableDefaults.length > 0 ? (
+            {catalog.length > 0 ? (
               <div className="grid gap-2 sm:grid-cols-2">
-                {availableDefaults.map((d) => {
-                  const active = selected.includes(d.provider_name);
+                {catalog.map((d) => {
+                  const active = selected.includes(d.id);
                   return (
                     <button
-                      key={d.provider_name}
+                      key={d.id}
                       type="button"
-                      onClick={() => toggleSelected(d.provider_name)}
+                      onClick={() => toggleSelected(d.id)}
                       className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
                         active ? 'border-primary bg-primary/10' : 'hover:bg-muted'
                       }`}
                     >
-                      <img src={d.provider_logo} alt={`${d.provider_name} logo`} className="h-8 w-8 rounded object-contain bg-muted p-0.5" />
+                      {d.provider_logo ? (
+                        <img src={d.provider_logo} alt={`${d.provider_name} logo`} className="h-8 w-8 rounded object-contain bg-muted p-0.5" />
+                      ) : (
+                        <div className="flex h-8 w-8 items-center justify-center rounded bg-muted text-[10px] font-bold uppercase">
+                          {d.provider_name?.slice(0, 3)}
+                        </div>
+                      )}
                       <span className="flex-1 text-sm font-medium">{d.provider_name}</span>
                       {active && <Check className="h-4 w-4 text-primary" />}
                     </button>
@@ -188,7 +223,7 @@ export default function ResellerProviders() {
                 })}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Shirkadaha caadiga ah dhammaan way ku jiraan.</p>
+              <p className="text-sm text-muted-foreground">Shirkadaha nidaamka dhammaan way ku jiraan.</p>
             )}
 
             <div className="space-y-2">
@@ -212,12 +247,9 @@ export default function ResellerProviders() {
         </DialogContent>
       </Dialog>
 
-
-
-
       <div className="grid gap-4 md:grid-cols-2">
         {items.map((p) => (
-          <Card key={p.id} className={p.is_active ? '' : 'opacity-70'}>
+          <Card key={p.id} className={p.is_enabled ? '' : 'opacity-70'}>
             <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
               <div className="flex items-center gap-3">
                 {p.provider_logo ? (
@@ -235,9 +267,9 @@ export default function ResellerProviders() {
                 </div>
               </div>
               <Switch
-                checked={p.is_active}
+                checked={p.is_enabled}
                 disabled={savingId === p.id}
-                onCheckedChange={(v) => patch(p, { is_active: v }, v ? 'Shirkadda waa la shiday' : 'Shirkadda waa la damiyay')}
+                onCheckedChange={(v) => patchLink(p, { is_enabled: v }, v ? 'Shirkadda waa la shiday' : 'Shirkadda waa la damiyay')}
               />
             </CardHeader>
             <CardContent className="space-y-4">
@@ -252,7 +284,7 @@ export default function ResellerProviders() {
                     onChange={(e) => setNumbers((n) => ({ ...n, [p.id]: e.target.value }))}
                   />
                   <Button
-                    onClick={() => patch(p, { payment_number: (numbers[p.id] ?? '').trim() || null }, 'Lambarka lacagta waa la kaydiyay')}
+                    onClick={() => patchLink(p, { payment_number: (numbers[p.id] ?? '').trim() || null }, 'Lambarka lacagta waa la kaydiyay')}
                     disabled={savingId === p.id || (numbers[p.id] ?? '') === (p.payment_number ?? '')}
                   >
                     <Save className="mr-2 h-4 w-4" /> Kaydi
@@ -271,7 +303,7 @@ export default function ResellerProviders() {
                 <Switch
                   checked={p.out_of_balance}
                   disabled={savingId === p.id}
-                  onCheckedChange={(v) => patch(p, { out_of_balance: v }, v ? 'Waa la calaamadiyay "Balance ma heyno"' : 'Balance-ka waa la celiyay')}
+                  onCheckedChange={(v) => patchProvider(p, v)}
                 />
               </div>
             </CardContent>
