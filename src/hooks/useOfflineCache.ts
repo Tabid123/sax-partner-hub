@@ -51,7 +51,7 @@ export const useOfflineCache = () => {
       const { data: providers } = await supabase.rpc('get_active_providers', { p_tenant_id: tenantId });
       if (providers) {
         localStorage.setItem(CACHE_KEYS.providers, JSON.stringify(providers));
-        queryClient.setQueryData(['providers'], providers);
+        queryClient.setQueryData(['providers', tenantId], providers);
         
         // Images are now local assets - no need to pre-fetch from Supabase Storage
       }
@@ -145,7 +145,7 @@ export const useOfflineCache = () => {
     try {
       const cachedProviders = localStorage.getItem(CACHE_KEYS.providers);
       if (cachedProviders) {
-        queryClient.setQueryData(['providers'], JSON.parse(cachedProviders));
+        queryClient.setQueryData(['providers', tenantId], JSON.parse(cachedProviders));
       }
 
       const cachedCategories = localStorage.getItem(CACHE_KEYS.categories);
@@ -237,7 +237,20 @@ export const useOfflineCache = () => {
           const { data } = await supabase.rpc('get_active_providers', { p_tenant_id: tenantId });
           if (data) {
             localStorage.setItem(CACHE_KEYS.providers, JSON.stringify(data));
-            queryClient.setQueryData(['providers'], data);
+            queryClient.setQueryData(['providers', tenantId], data);
+            localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tenant_providers', filter: tenantId ? `tenant_id=eq.${tenantId}` : undefined },
+        async () => {
+          const { data } = await supabase.rpc('get_active_providers', { p_tenant_id: tenantId });
+          if (data) {
+            localStorage.setItem(CACHE_KEYS.providers, JSON.stringify(data));
+            if (tenantId) localStorage.setItem(`offline_providers:${tenantId}`, JSON.stringify(data));
+            queryClient.setQueryData(['providers', tenantId], data);
             localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
           }
         }

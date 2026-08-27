@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,7 @@ const ORDER = ['hormuud', 'somnet', 'somtel', 'amtel'];
 
 export default function ResellerProviders() {
   const { currentTenantId } = useTenant();
+  const queryClient = useQueryClient();
   const [items, setItems] = useState<ProviderRow[]>([]);
   const [catalog, setCatalog] = useState<{ id: string; provider_name: string; provider_logo: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,8 +43,13 @@ export default function ResellerProviders() {
   const [selected, setSelected] = useState<string[]>([]);
   const [customName, setCustomName] = useState('');
 
-  const load = async () => {
-    if (!currentTenantId) return;
+  const load = useCallback(async () => {
+    if (!currentTenantId) {
+      setItems([]);
+      setCatalog([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
 
     // Providers-ku waa system-wide; tenant_providers ayaa go'aaminaya kuwa la shiday.
@@ -59,7 +66,13 @@ export default function ResellerProviders() {
     ]);
 
     const error = pErr || lErr;
-    if (error) toast({ title: 'Khalad', description: error.message, variant: 'destructive' });
+    if (error) {
+      setItems([]);
+      setCatalog([]);
+      setLoading(false);
+      toast({ title: 'Khalad', description: error.message, variant: 'destructive' });
+      return;
+    }
 
     const linkMap = new Map((links ?? []).map((l: any) => [l.provider_id, l]));
     const all = (providers ?? []) as any[];
@@ -84,9 +97,22 @@ export default function ResellerProviders() {
     setCatalog(all.filter((p) => !linkMap.has(p.id)).map((p) => ({ id: p.id, provider_name: p.provider_name, provider_logo: p.provider_logo })));
     setNumbers(Object.fromEntries(rows.map((r) => [r.id, r.payment_number ?? ''])));
     setLoading(false);
-  };
+  }, [currentTenantId]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [currentTenantId]);
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!currentTenantId) return;
+    const channel = supabase
+      .channel(`reseller-providers-${currentTenantId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tenant_providers', filter: `tenant_id=eq.${currentTenantId}` },
+        () => { load(); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [currentTenantId, load]);
 
   /** Cusboonaysii xiriirka tenant ↔ provider. */
   const patchLink = async (row: ProviderRow, changes: { is_enabled?: boolean; payment_number?: string | null }, message: string) => {
@@ -94,12 +120,16 @@ export default function ResellerProviders() {
     setSavingId(row.id);
     const { error } = await supabase
       .from('tenant_providers')
-      .update(changes)
-      .eq('tenant_id', currentTenantId)
-      .eq('provider_id', row.id);
+      .upsert(
+        { tenant_id: currentTenantId, provider_id: row.id, is_enabled: row.is_enabled, ...changes },
+        { onConflict: 'tenant_id,provider_id' },
+      );
     setSavingId(null);
     if (error) { toast({ title: 'Khalad', description: error.message, variant: 'destructive' }); return; }
     setItems((prev) => prev.map((p) => (p.id === row.id ? { ...p, ...changes } as ProviderRow : p)));
+    localStorage.removeItem(`offline_providers:${currentTenantId}`);
+    localStorage.removeItem('offline_providers');
+    await queryClient.invalidateQueries({ queryKey: ['providers', currentTenantId] });
     toast({ title: 'Guul', description: message });
   };
 
@@ -143,10 +173,13 @@ export default function ResellerProviders() {
     if (error) { toast({ title: 'Khalad', description: error.message, variant: 'destructive' }); return; }
 
     toast({ title: 'Guul', description: `${ids.length} shirkadood ayaa lagu daray` });
+    localStorage.removeItem(`offline_providers:${currentTenantId}`);
+    localStorage.removeItem('offline_providers');
+    await queryClient.invalidateQueries({ queryKey: ['providers', currentTenantId] });
     setPickerOpen(false);
     setSelected([]);
     setCustomName('');
-    load();
+    await load();
   };
 
   const toggleSelected = (id: string) =>
