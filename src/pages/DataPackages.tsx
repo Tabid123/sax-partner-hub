@@ -116,7 +116,7 @@ const DataPackages = () => {
   }, [queryClient, tenantId]);
 
   const { data: categories = [] } = useQuery({
-    queryKey: ['categories', provider],
+    queryKey: ['categories', provider, tenantId],
     queryFn: async () => {
       // Try cache first if offline
       if (!isReallyOnline) {
@@ -128,12 +128,13 @@ const DataPackages = () => {
       }
       
       const { data, error } = await supabase.rpc('get_active_categories', { 
-        provider_uuid: provider || null 
+        provider_uuid: provider || null,
+        p_tenant_id: tenantId,
       });
       if (error) throw error;
       return data || [];
     },
-    enabled: !!provider,
+    enabled: !!provider && !!tenantId,
     staleTime: 30 * 1000,
     retry: false,
     initialData: () => {
