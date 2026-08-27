@@ -397,7 +397,7 @@ export const JumloFlow: React.FC<Props> = ({ open, onClose, providerId, provider
                   <div className="bg-gray-50 rounded-xl px-4 py-3 mb-4 flex items-center justify-between text-sm">
                     <span className="text-gray-600">
                       Amount: <span className="font-semibold text-gray-800">${numericAmount}</span> → You receive:{' '}
-                      <span className="font-semibold text-gray-800">${youReceive}</span>
+                      <span className="font-semibold text-gray-800">${youReceive.toFixed(2)}</span>
                     </span>
                   </div>
 
