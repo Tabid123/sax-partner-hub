@@ -194,6 +194,7 @@ export const JumloFlow: React.FC<Props> = ({ open, onClose, providerId, provider
         p_payment_provider: selectedMethod.provider_name,
         p_expected_amount: numericAmount,
         p_topup_amount: youReceive,
+        p_tenant_id: tenantId,
       });
       const result: any = await Promise.race([
         rpcPromise,
