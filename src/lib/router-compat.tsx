@@ -8,7 +8,6 @@ import {
   useNavigate as useTanstackNavigate,
   useLocation as useTanstackLocation,
   useParams as useTanstackParams,
-  useRouter,
 } from "@tanstack/react-router";
 
 function splitPath(to: string) {
