@@ -41,12 +41,9 @@ export default function TenantProvidersManager() {
       if (cancelled) return;
       const list = (provs ?? []) as ProviderRow[];
       const map: Record<string, boolean> = {};
-      // no rows yet => everything is on by default
-      const hasLinks = (links ?? []).length > 0;
+      // default: everything OFF until the tenant admin turns it on
       list.forEach((p) => {
-        map[p.id] = hasLinks
-          ? !!links?.find((l) => l.provider_id === p.id)?.is_enabled
-          : true;
+        map[p.id] = !!links?.find((l) => l.provider_id === p.id)?.is_enabled;
       });
       setProviders(list);
       setEnabled(map);
@@ -68,7 +65,7 @@ export default function TenantProvidersManager() {
     const rows = providers.map((p) => ({
       tenant_id: tenantId,
       provider_id: p.id,
-      is_enabled: p.id === providerId ? next : (enabled[p.id] ?? true),
+      is_enabled: p.id === providerId ? next : (enabled[p.id] ?? false),
     }));
 
     const { error } = await supabase
