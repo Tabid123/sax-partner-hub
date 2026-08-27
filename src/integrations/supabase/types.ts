@@ -82,7 +82,7 @@ export type Database = {
           sim1_provider: string | null
           sim2_number: string | null
           sim2_provider: string | null
-          tenant_id: string | null
+          tenant_id: string
           total_deliveries: number | null
         }
         Insert: {
@@ -101,7 +101,7 @@ export type Database = {
           sim1_provider?: string | null
           sim2_number?: string | null
           sim2_provider?: string | null
-          tenant_id?: string | null
+          tenant_id?: string
           total_deliveries?: number | null
         }
         Update: {
@@ -120,7 +120,7 @@ export type Database = {
           sim1_provider?: string | null
           sim2_number?: string | null
           sim2_provider?: string | null
-          tenant_id?: string | null
+          tenant_id?: string
           total_deliveries?: number | null
         }
         Relationships: [
@@ -793,7 +793,7 @@ export type Database = {
           scheduled_at: string | null
           sim_slot: number | null
           status: string | null
-          tenant_id: string | null
+          tenant_id: string
           topup_amount: number | null
           ussd_code: string
         }
@@ -815,7 +815,7 @@ export type Database = {
           scheduled_at?: string | null
           sim_slot?: number | null
           status?: string | null
-          tenant_id?: string | null
+          tenant_id?: string
           topup_amount?: number | null
           ussd_code: string
         }
@@ -837,7 +837,7 @@ export type Database = {
           scheduled_at?: string | null
           sim_slot?: number | null
           status?: string | null
-          tenant_id?: string | null
+          tenant_id?: string
           topup_amount?: number | null
           ussd_code?: string
         }
@@ -1311,7 +1311,7 @@ export type Database = {
           selling_price: number
           sender_phone: string | null
           status: string
-          tenant_id: string | null
+          tenant_id: string
           updated_at: string
         }
         Insert: {
@@ -1335,7 +1335,7 @@ export type Database = {
           selling_price: number
           sender_phone?: string | null
           status?: string
-          tenant_id?: string | null
+          tenant_id?: string
           updated_at?: string
         }
         Update: {
@@ -1359,7 +1359,7 @@ export type Database = {
           selling_price?: number
           sender_phone?: string | null
           status?: string
-          tenant_id?: string | null
+          tenant_id?: string
           updated_at?: string
         }
         Relationships: [
@@ -1825,7 +1825,7 @@ export type Database = {
           receiver_phone: string
           sender_phone: string | null
           status: string | null
-          tenant_id: string | null
+          tenant_id: string
           tier_id: string | null
           topup_amount: number | null
           ussd_code: string | null
@@ -1843,7 +1843,7 @@ export type Database = {
           receiver_phone: string
           sender_phone?: string | null
           status?: string | null
-          tenant_id?: string | null
+          tenant_id?: string
           tier_id?: string | null
           topup_amount?: number | null
           ussd_code?: string | null
@@ -1861,7 +1861,7 @@ export type Database = {
           receiver_phone?: string
           sender_phone?: string | null
           status?: string | null
-          tenant_id?: string | null
+          tenant_id?: string
           tier_id?: string | null
           topup_amount?: number | null
           ussd_code?: string | null
@@ -2569,7 +2569,7 @@ export type Database = {
           id: string
           last_login_at: string
           phone_number: string
-          tenant_id: string | null
+          tenant_id: string
           updated_at: string
           verification_code: string | null
           verified_at: string
@@ -2579,7 +2579,7 @@ export type Database = {
           id?: string
           last_login_at?: string
           phone_number: string
-          tenant_id?: string | null
+          tenant_id?: string
           updated_at?: string
           verification_code?: string | null
           verified_at?: string
@@ -2589,7 +2589,7 @@ export type Database = {
           id?: string
           last_login_at?: string
           phone_number?: string
-          tenant_id?: string | null
+          tenant_id?: string
           updated_at?: string
           verification_code?: string | null
           verified_at?: string
@@ -2843,7 +2843,7 @@ export type Database = {
           scheduled_at: string | null
           sim_slot: number | null
           status: string | null
-          tenant_id: string | null
+          tenant_id: string
           topup_amount: number | null
           ussd_code: string
         }[]
