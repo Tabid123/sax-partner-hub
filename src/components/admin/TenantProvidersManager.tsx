@@ -65,7 +65,7 @@ export default function TenantProvidersManager() {
     const rows = providers.map((p) => ({
       tenant_id: tenantId,
       provider_id: p.id,
-      is_enabled: p.id === providerId ? next : (enabled[p.id] ?? true),
+      is_enabled: p.id === providerId ? next : (enabled[p.id] ?? false),
     }));
 
     const { error } = await supabase
