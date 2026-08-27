@@ -126,8 +126,9 @@ export const JumloFlow: React.FC<Props> = ({ open, onClose, providerId, provider
   const inRange = selectedTier
     ? numericAmount >= Number(selectedTier.min_amount) && numericAmount <= Number(selectedTier.max_amount)
     : false;
+  // Ha la sare u qaadin (no rounding up): jar 2 tobanle — tusaale 1 x 15.5% = 1.155 => 1.15
   const youReceive = selectedTier && inRange
-    ? +(numericAmount + (numericAmount * Number(selectedTier.profit_rate)) / 100).toFixed(2)
+    ? Math.floor((numericAmount + (numericAmount * Number(selectedTier.profit_rate)) / 100) * 100) / 100
     : 0;
 
   const handleSelectTier = (id: string) => {
@@ -371,9 +372,11 @@ export const JumloFlow: React.FC<Props> = ({ open, onClose, providerId, provider
                     <div className="mt-4 border-2 border-dashed rounded-xl py-4 text-center" style={{ borderColor: brandColor }}>
                       <p className="text-sm text-gray-500">You will receive:</p>
                       <p className="text-3xl font-extrabold mt-1" style={{ color: brandColor }}>
-                        ${youReceive}
+                        ${youReceive.toFixed(2)}
                       </p>
-                      <p className="text-xs text-gray-400 mt-1">Rate: {Number(selectedTier.profit_rate)}%</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Profit Rate: {Number(selectedTier.profit_rate)}%
+                      </p>
                     </div>
                   )}
 
