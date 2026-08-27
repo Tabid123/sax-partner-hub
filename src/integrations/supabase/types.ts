@@ -2276,6 +2276,51 @@ export type Database = {
           },
         ]
       }
+      tenant_providers: {
+        Row: {
+          created_at: string
+          id: string
+          is_enabled: boolean
+          payment_number: string | null
+          provider_id: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          payment_number?: string | null
+          provider_id: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          payment_number?: string | null
+          provider_id?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_providers_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_providers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_subscriptions: {
         Row: {
           amount: number

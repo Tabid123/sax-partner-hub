@@ -25,6 +25,7 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { TenantSetupDialog } from '@/components/tenant/TenantSetupDialog';
 import { useTenant } from '@/contexts/TenantContext';
+import TenantProvidersManager from '@/components/admin/TenantProvidersManager';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
@@ -1307,6 +1308,7 @@ const AdminDashboard = () => {
                 {/* Providers Tab */}
                 {activeTab === 'providers' && (
                   <TabsContent value="providers" className="space-y-6">
+                    <TenantProvidersManager />
                     <Card>
                       <CardHeader><CardTitle>{language === 'so' ? 'Ku dar Shirkad Cusub' : 'Add Provider'}</CardTitle></CardHeader>
                       <CardContent className="space-y-4">
