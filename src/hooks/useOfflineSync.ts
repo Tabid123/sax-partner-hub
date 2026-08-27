@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useConnectivity } from '@/contexts/ConnectivityContext';
+import { useTenant } from '@/contexts/TenantContext';
 
 interface QueuedOrder {
   id: string;
@@ -12,6 +13,7 @@ const QUEUE_KEY = 'iftin_queued_orders';
 
 export const useOfflineSync = () => {
   const { isReallyOnline } = useConnectivity();
+  const { currentTenantId } = useTenant();
   const [queuedOrders, setQueuedOrders] = useState<QueuedOrder[]>([]);
 
   useEffect(() => {
@@ -92,9 +94,11 @@ export const useOfflineSync = () => {
     for (const queuedOrder of queuedOrders) {
       try {
         // Safety guard: ensure payment_source is set so DB default doesn't kick in
+        // Tenant wall: an offline order always belongs to the shop it was made in
         const orderData = {
           ...queuedOrder.data,
           payment_source: queuedOrder.data.payment_source || 'sms_offline',
+          tenant_id: queuedOrder.data.tenant_id || currentTenantId || null,
         };
         const { error } = await supabase
           .from('orders')

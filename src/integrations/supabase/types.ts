@@ -2923,6 +2923,10 @@ export type Database = {
       current_delivery_tenant: { Args: never; Returns: string }
       current_tenant_id: { Args: never; Returns: string }
       default_tenant_id: { Args: never; Returns: string }
+      delete_customer_account: {
+        Args: { p_phone: string; p_tenant_id?: string }
+        Returns: Json
+      }
       expire_tenant_subscriptions: { Args: never; Returns: Json }
       force_delete_provider: { Args: { p_provider_id: string }; Returns: Json }
       generate_daily_outreach_targets: {
@@ -3031,6 +3035,25 @@ export type Database = {
       get_admin_transactions_summary: {
         Args: { p_period: string; p_provider_id: string }
         Returns: Json
+      }
+      get_customer_order_history: {
+        Args: { customer_phone_number: string; p_tenant_id?: string }
+        Returns: {
+          created_at: string
+          customer_phone: string
+          data_amount: string
+          delivery_status: string
+          id: string
+          invoice_url: string
+          package_name: string
+          provider_logo: string
+          provider_name: string
+          receiver_phone: string
+          selling_price: number
+          sender_phone: string
+          status: string
+          validity_days: string
+        }[]
       }
       get_delivery_session: { Args: never; Returns: Json }
       get_featured_packages: {
@@ -3227,6 +3250,10 @@ export type Database = {
           _starts_at: string
           _tenant: string
         }
+        Returns: Json
+      }
+      upsert_verified_phone: {
+        Args: { p_code?: string; p_phone: string; p_tenant_id?: string }
         Returns: Json
       }
     }

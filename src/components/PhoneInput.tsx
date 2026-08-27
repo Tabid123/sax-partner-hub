@@ -7,6 +7,7 @@ import somaliaFlag from '@/assets/somalia-flag-hq.png';
 import { useNavigate } from "@/lib/router-compat";
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, ShieldCheck } from 'lucide-react';
+import { useTenant } from '@/contexts/TenantContext';
 
 const PhoneInput = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -20,6 +21,7 @@ const PhoneInput = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { currentTenantId } = useTenant();
 
   const generateVerificationCode = () => {
     return Math.floor(1000 + Math.random() * 9000).toString();
@@ -66,6 +68,7 @@ const PhoneInput = () => {
         .from('verified_phones')
         .select('id, verified_at')
         .eq('phone_number', fullPhoneNumber)
+        .eq('tenant_id', currentTenantId ?? '')
         .maybeSingle();
       
       if (existingPhone) {
@@ -134,27 +137,11 @@ const PhoneInput = () => {
       try {
         const fullPhoneNumber = `+252${phoneNumber}`;
         
-        const { data: existingPhone } = await supabase
-          .from('verified_phones')
-          .select('id')
-          .eq('phone_number', fullPhoneNumber)
-          .maybeSingle();
-        
-        if (existingPhone) {
-          await supabase
-            .from('verified_phones')
-            .update({ last_login_at: new Date().toISOString() })
-            .eq('phone_number', fullPhoneNumber);
-        } else {
-          await supabase
-            .from('verified_phones')
-            .insert({
-              phone_number: fullPhoneNumber,
-              verification_code: storedCode,
-              verified_at: new Date().toISOString(),
-              last_login_at: new Date().toISOString()
-            });
-        }
+        await (supabase as any).rpc('upsert_verified_phone', {
+          p_phone: fullPhoneNumber,
+          p_code: storedCode,
+          p_tenant_id: currentTenantId
+        });
       } catch (error) {
         console.error('Error saving verified phone:', error);
       }

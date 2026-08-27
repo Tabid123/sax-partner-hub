@@ -7,10 +7,12 @@ import { BottomNavigation } from '@/components/BottomNavigation';
 import { showBannerAd, hideBannerAd } from '@/services/admob';
 import { supabase } from '@/integrations/supabase/client';
 import { useBrand } from '@/hooks/useBrand';
+import { useTenant } from '@/contexts/TenantContext';
 
 const Profile = () => {
   const navigate = useNavigate();
   const { name: brandName, primary } = useBrand();
+  const { currentTenantId } = useTenant();
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -50,8 +52,10 @@ const Profile = () => {
     try {
       const phone = verifiedPhone || phoneNumber;
       if (phone) {
-        await supabase.from('verified_phones').delete().eq('phone_number', phone);
-        await supabase.from('orders').delete().or(`customer_phone.eq.${phone},sender_phone.eq.${phone}`);
+        await (supabase as any).rpc('delete_customer_account', {
+          p_phone: phone,
+          p_tenant_id: currentTenantId
+        });
       }
       localStorage.clear();
       setIsDeleteDialogOpen(false);

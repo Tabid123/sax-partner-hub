@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/contexts/TenantContext';
 
 interface Notification {
   id: string;
@@ -11,17 +12,20 @@ interface Notification {
 
 export function useNotifications() {
   const queryClient = useQueryClient();
+  const { currentTenantId } = useTenant();
   const [lastSeenTimestamp, setLastSeenTimestamp] = useState<string | null>(() => {
     return localStorage.getItem('lastSeenNotification');
   });
 
   const { data: notifications, isLoading } = useQuery({
-    queryKey: ['user-notifications'],
+    queryKey: ['user-notifications', currentTenantId],
     queryFn: async () => {
+      if (!currentTenantId) return [] as Notification[];
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
         .eq('is_active', true)
+        .eq('tenant_id', currentTenantId)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -42,7 +46,7 @@ export function useNotifications() {
         },
         (payload) => {
           console.log('New notification received:', payload);
-          queryClient.invalidateQueries({ queryKey: ['user-notifications'] });
+          queryClient.invalidateQueries({ queryKey: ['user-notifications', currentTenantId] });
         }
       )
       .on(
@@ -53,7 +57,7 @@ export function useNotifications() {
           table: 'notifications'
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['user-notifications'] });
+          queryClient.invalidateQueries({ queryKey: ['user-notifications', currentTenantId] });
         }
       )
       .subscribe();
@@ -61,7 +65,7 @@ export function useNotifications() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [queryClient, currentTenantId]);
 
   // Calculate unread count
   const unreadCount = notifications?.filter((notif) => {
