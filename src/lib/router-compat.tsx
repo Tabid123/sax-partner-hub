@@ -129,7 +129,11 @@ export function Navigate({
   const navigate = useNavigate();
   useEffect(() => {
     navigate(to, { replace });
-  }, [to, replace, navigate]);
+    // `useNavigate` may receive a new router callback while the transition is
+    // committing. The destination is the trigger; rerunning for callback
+    // identity changes creates an infinite redirect loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [to, replace]);
   return null;
 }
 
