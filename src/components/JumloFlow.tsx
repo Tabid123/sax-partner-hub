@@ -372,9 +372,11 @@ export const JumloFlow: React.FC<Props> = ({ open, onClose, providerId, provider
                     <div className="mt-4 border-2 border-dashed rounded-xl py-4 text-center" style={{ borderColor: brandColor }}>
                       <p className="text-sm text-gray-500">You will receive:</p>
                       <p className="text-3xl font-extrabold mt-1" style={{ color: brandColor }}>
-                        ${youReceive}
+                        ${youReceive.toFixed(2)}
                       </p>
-                      <p className="text-xs text-gray-400 mt-1">Rate: {Number(selectedTier.profit_rate)}%</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Profit Rate: {Number(selectedTier.profit_rate)}%
+                      </p>
                     </div>
                   )}
 
