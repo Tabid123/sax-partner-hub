@@ -3259,6 +3259,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_any_tenant_manager: { Args: never; Returns: boolean }
       is_super_admin: { Args: { _user_id?: string }; Returns: boolean }
       is_tenant_manager: { Args: { _tenant_id: string }; Returns: boolean }
       is_tenant_member: { Args: { _tenant_id: string }; Returns: boolean }
