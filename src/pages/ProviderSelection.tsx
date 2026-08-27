@@ -103,13 +103,22 @@ const ProviderSelection = () => {
   // Realtime providers
   useEffect(() => {
     const channel: RealtimeChannel = supabase
-      .channel('providers-realtime')
+      .channel(`providers-realtime-${tenantId ?? 'none'}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'providers_config' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['providers'] });
+        if (providerCacheKey) localStorage.removeItem(providerCacheKey);
+        queryClient.invalidateQueries({ queryKey: ['providers', tenantId] });
       })
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tenant_providers', filter: tenantId ? `tenant_id=eq.${tenantId}` : undefined },
+        () => {
+          if (providerCacheKey) localStorage.removeItem(providerCacheKey);
+          queryClient.invalidateQueries({ queryKey: ['providers', tenantId] });
+        },
+      )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [queryClient]);
+  }, [providerCacheKey, queryClient, tenantId]);
 
   const { data: providers = [] } = useQuery<Provider[]>({
     queryKey: ['providers', tenantId],
