@@ -2866,31 +2866,60 @@ export type Database = {
         }
         Returns: Json
       }
-      create_jumlo_payment_reservation: {
-        Args: {
-          p_data_phone: string
-          p_expected_amount: number
-          p_payment_provider: string
-          p_provider_id: string
-          p_sender_phone: string
-          p_tier_id: string
-          p_topup_amount: number
-          p_verified_phone: string
-        }
-        Returns: Json
-      }
-      create_online_payment_reservation: {
-        Args: {
-          p_expected_amount: number
-          p_package_id: string
-          p_payment_provider: string
-          p_provider_id: string
-          p_receiver_phone: string
-          p_sender_phone: string
-          p_verified_phone: string
-        }
-        Returns: Json
-      }
+      create_jumlo_payment_reservation:
+        | {
+            Args: {
+              p_data_phone: string
+              p_expected_amount: number
+              p_payment_provider: string
+              p_provider_id: string
+              p_sender_phone: string
+              p_tier_id: string
+              p_topup_amount: number
+              p_verified_phone: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_data_phone: string
+              p_expected_amount: number
+              p_payment_provider: string
+              p_provider_id: string
+              p_sender_phone: string
+              p_tenant_id?: string
+              p_tier_id: string
+              p_topup_amount: number
+              p_verified_phone: string
+            }
+            Returns: Json
+          }
+      create_online_payment_reservation:
+        | {
+            Args: {
+              p_expected_amount: number
+              p_package_id: string
+              p_payment_provider: string
+              p_provider_id: string
+              p_receiver_phone: string
+              p_sender_phone: string
+              p_verified_phone: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_expected_amount: number
+              p_package_id: string
+              p_payment_provider: string
+              p_provider_id: string
+              p_receiver_phone: string
+              p_sender_phone: string
+              p_tenant_id?: string
+              p_verified_phone: string
+            }
+            Returns: Json
+          }
       current_delivery_tenant: { Args: never; Returns: string }
       current_tenant_id: { Args: never; Returns: string }
       default_tenant_id: { Args: never; Returns: string }
