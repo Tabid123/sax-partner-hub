@@ -2,7 +2,7 @@
  * Compatibility layer that exposes a react-router-dom-like API on top of
  * TanStack Router, so pages imported from the original app keep working.
  */
-import { forwardRef, useEffect, type AnchorHTMLAttributes } from "react";
+import { forwardRef, useCallback, useEffect, type AnchorHTMLAttributes } from "react";
 import {
   Link as TanstackLink,
   useNavigate as useTanstackNavigate,
@@ -29,9 +29,8 @@ function splitPath(to: string) {
 
 export function useNavigate() {
   const navigate = useTanstackNavigate();
-  const router = useRouter();
 
-  return (to: string | number, options?: { replace?: boolean; state?: unknown }) => {
+  return useCallback((to: string | number, options?: { replace?: boolean; state?: unknown }) => {
     if (typeof to === "number") {
       if (typeof window !== "undefined") window.history.go(to);
       return;
@@ -41,7 +40,6 @@ export function useNavigate() {
       return;
     }
     const parsed = splitPath(to);
-    void router; // keep router referenced for stable behavior across versions
     navigate({
       to: parsed.to,
       search: parsed.search,
@@ -49,7 +47,7 @@ export function useNavigate() {
       replace: options?.replace,
       state: (options?.state ?? undefined) as never,
     } as never);
-  };
+  }, [navigate]);
 }
 
 export function useLocation() {
