@@ -28,34 +28,42 @@ export default function ResellerSimPins() {
     if (!tenantId) return;
     setLoading(true);
     try {
+      // Shirkadaha waa system-wide; tenant-ku wuxuu shitaa kuwuu doono via tenant_providers
+      const { data: links, error: lErr } = await supabase
+        .from("tenant_providers")
+        .select("provider_id")
+        .eq("tenant_id", tenantId)
+        .eq("is_enabled", true);
+      if (lErr) throw lErr;
+
+      const ids = (links ?? []).map((l) => l.provider_id);
+      if (!ids.length) {
+        setRows([]);
+        return;
+      }
+
       const { data: provs, error: pErr } = await supabase
         .from("providers_config")
         .select("id, provider_name, display_order")
-        .eq("tenant_id", tenantId)
+        .in("id", ids)
         .order("display_order", { ascending: true });
       if (pErr) throw pErr;
 
-      const ids = (provs ?? []).map((p) => p.id);
-      let instr: any[] = [];
-      if (ids.length) {
-        const { data, error } = await supabase
-          .from("delivery_instructions")
-          .select("provider_id, sim_password")
-          .in("provider_id", ids);
-        if (error) throw error;
-        instr = data ?? [];
-      }
+      const { data: pins, error: sErr } = await supabase
+        .from("tenant_sim_pins")
+        .select("provider_id, pin")
+        .eq("tenant_id", tenantId);
+      if (sErr) throw sErr;
 
       setRows(
         (provs ?? []).map((p) => {
-          const match = instr.find((i) => i.provider_id === p.id && i.sim_password);
-          const pin = match?.sim_password ?? "";
+          const pin = pins?.find((x) => x.provider_id === p.id)?.pin ?? "";
           return {
             provider_id: p.id,
             provider_name: p.provider_name,
             pin,
             saved: pin,
-            hasRow: instr.some((i) => i.provider_id === p.id),
+            hasRow: !!pin,
           };
         })
       );
@@ -84,27 +92,19 @@ export default function ResellerSimPins() {
     }
     setSavingId(row.provider_id);
     try {
-      if (row.hasRow) {
-        // Update EVERY instruction row of this provider (category/package level too)
-        const { error } = await supabase
-          .from("delivery_instructions")
-          .update({ sim_password: row.pin })
-          .eq("provider_id", row.provider_id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("delivery_instructions").insert({
-          tenant_id: tenantId,
-          provider_id: row.provider_id,
-          instruction_template: "",
-          sim_password: row.pin,
-          ussd_method: "interactive",
-        });
-        if (error) throw error;
-      }
-      // Refresh PIN on deliveries that are still waiting so they use the new PIN
+      const { error } = await supabase
+        .from("tenant_sim_pins")
+        .upsert(
+          { tenant_id: tenantId, provider_id: row.provider_id, pin: row.pin },
+          { onConflict: "tenant_id,provider_id" }
+        );
+      if (error) throw error;
+
+      // Cusboonaysii dalabyada wali sugaya ee tenant-kan si ay u isticmaalaan PIN-ka cusub
       const { data: pendingOrders } = await supabase
         .from("orders")
         .select("id")
+        .eq("tenant_id", tenantId)
         .eq("provider_id", row.provider_id);
       const orderIds = (pendingOrders ?? []).map((o: any) => o.id);
       if (orderIds.length) {
@@ -112,6 +112,7 @@ export default function ResellerSimPins() {
           await supabase
             .from("delivery_queue")
             .update({ pin_code: row.pin })
+            .eq("tenant_id", tenantId)
             .in("order_id", orderIds.slice(i, i + 200))
             .in("status", ["pending", "failed", "processing"]);
         }
@@ -152,7 +153,7 @@ export default function ResellerSimPins() {
         )}
 
         {!loading && rows.length === 0 && (
-          <p className="py-6 text-sm text-muted-foreground">Wax shirkad ah lagama helin workspace-kaaga.</p>
+          <p className="py-6 text-sm text-muted-foreground">Wax shirkad ah maad shidin weli. Aad bogga \u201cShirkadaha\u201d oo shid shirkadaha aad rabto.</p>
         )}
 
         {!loading &&
