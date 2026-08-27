@@ -857,7 +857,8 @@ serve(async (req) => {
               .maybeSingle();
             tierProfitRate = Number(tierMatch?.profit_rate || 0);
           }
-          const topupAmount = Number((Number(smsAmount) * (1 + tierProfitRate / 100)).toFixed(2));
+          // Ha la sare u qaadin — jar 2 tobanle si ay ula mid noqoto tii macmiilku arkay (UI)
+          const topupAmount = Math.floor(Number(smsAmount) * (1 + tierProfitRate / 100) * 100) / 100;
           console.log('🧮 Jumlo tier rate:', { tier_id: pendingOnline.tier_id, tierProfitRate, smsAmount, topupAmount });
 
           // Fetch sim_password from delivery_instructions for this provider (provider default)
