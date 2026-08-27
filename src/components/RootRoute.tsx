@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Navigate, useSearchParams } from "@/lib/router-compat";
+import { Navigate } from "@tanstack/react-router";
+import { useSearchParams } from "@/lib/router-compat";
 import Landing from '@/pages/Landing';
 
 /** True when the app is launched from the home screen (installed PWA). */
@@ -42,7 +43,7 @@ const RootRoute = () => {
 
   const target = slug || pwaSlug;
   if (target) {
-    return <Navigate to={`/providers?t=${encodeURIComponent(target)}`} replace />;
+    return <Navigate to="/providers" search={{ t: target }} replace />;
   }
 
   return <Landing />;
