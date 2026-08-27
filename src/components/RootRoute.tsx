@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Navigate, useSearchParams } from "@/lib/router-compat";
+import { useSearchParams } from "@/lib/router-compat";
+import { RefreshCw } from "lucide-react";
 import Landing from '@/pages/Landing';
 
 /** True when the app is launched from the home screen (installed PWA). */
@@ -41,8 +42,17 @@ const RootRoute = () => {
   }, [slug]);
 
   const target = slug || pwaSlug;
+  useEffect(() => {
+    if (!target) return;
+    window.location.replace(`/providers?t=${encodeURIComponent(target)}`);
+  }, [target]);
+
   if (target) {
-    return <Navigate to={`/providers?t=${encodeURIComponent(target)}`} replace />;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <RefreshCw className="h-7 w-7 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return <Landing />;

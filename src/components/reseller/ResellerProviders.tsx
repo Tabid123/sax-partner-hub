@@ -50,6 +50,7 @@ export default function ResellerProviders() {
       supabase
         .from('providers_config')
         .select('id, provider_name, provider_logo, out_of_balance, payment_number, display_order')
+        .is('tenant_id', null)
         .eq('is_active', true),
       supabase
         .from('tenant_providers')
@@ -123,7 +124,7 @@ export default function ResellerProviders() {
       const name = newName.trim();
       const { data: created, error: cErr } = await supabase
         .from('providers_config')
-        .insert({ provider_name: name, is_active: true, display_order: 99 })
+        .insert({ provider_name: name, is_active: true, display_order: 99, tenant_id: null })
         .select('id')
         .single();
       if (cErr) { setSavingId(null); toast({ title: 'Khalad', description: cErr.message, variant: 'destructive' }); return; }

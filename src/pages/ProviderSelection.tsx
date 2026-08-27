@@ -270,10 +270,23 @@ const ProviderSelection = () => {
   // Tenant (reseller) branding — falls back to default app brand
   const { logoUrl, name: brandName, primary: brandColor } = useBrand();
 
-  if (tenantLoading || !tenantId) {
+  if (tenantLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <RefreshCw className="h-7 w-7 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!tenantId) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-6">
+        <div className="max-w-sm text-center">
+          <h1 className="text-xl font-bold text-foreground">Link-ga shirkadda lama helin</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Link-gu waa khaldan yahay ama shirkaddan hadda ma shaqaynayso.
+          </p>
+        </div>
       </div>
     );
   }
