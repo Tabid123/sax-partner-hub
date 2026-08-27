@@ -159,8 +159,11 @@ const ProviderSelection = () => {
               (a.display_order ?? 0) - (b.display_order ?? 0) ||
               Number(a.min_amount) - Number(b.min_amount),
           )[0];
-          const rate = Number(first.payout_rate ?? first.profit_rate) || 0;
+          // Rate-ka admin-ku qoray: payout_rate haddii la buuxiyay, haddii kale profit_rate
+          const payout = Number(first.payout_rate) || 0;
+          const rate = payout > 0 ? payout : Number(first.profit_rate) || 0;
           if (rate > 0) map[p.id] = rate;
+
         }),
       );
       return map;
