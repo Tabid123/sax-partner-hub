@@ -2321,6 +2321,48 @@ export type Database = {
           },
         ]
       }
+      tenant_sim_pins: {
+        Row: {
+          created_at: string
+          id: string
+          pin: string
+          provider_id: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pin: string
+          provider_id: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pin?: string
+          provider_id?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_sim_pins_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_sim_pins_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_subscriptions: {
         Row: {
           amount: number
