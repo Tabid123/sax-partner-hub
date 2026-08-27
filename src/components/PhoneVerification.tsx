@@ -13,6 +13,7 @@ import somnetLogo from '@/assets/providers/somnet-logo.png';
 import amtelLogo from '@/assets/providers/amtel-logo.png';
 import somlinkLogo from '@/assets/providers/somlink-logo.png';
 import { setUserPhone } from '@/services/onesignal';
+import { useTenant } from '@/contexts/TenantContext';
 
 interface PhoneVerificationProps {
   isOpen: boolean;
@@ -242,30 +243,12 @@ const PhoneVerification = ({ isOpen, onClose, onSuccess, paymentProvider, packag
       try {
         const fullPhoneNumber = `+252${phoneNumber}`;
         
-        // Check if phone already exists in verified_phones
-        const { data: existingPhone } = await supabase
-          .from('verified_phones')
-          .select('id')
-          .eq('phone_number', fullPhoneNumber)
-          .maybeSingle();
-        
-        if (existingPhone) {
-          // Update last login
-          await supabase
-            .from('verified_phones')
-            .update({ last_login_at: new Date().toISOString() })
-            .eq('phone_number', fullPhoneNumber);
-        } else {
-          // Insert new verified phone
-          await supabase
-            .from('verified_phones')
-            .insert({
-              phone_number: fullPhoneNumber,
-              verification_code: storedCode,
-              verified_at: new Date().toISOString(),
-              last_login_at: new Date().toISOString()
-            });
-        }
+        // Tenant-scoped: a phone verified for one company never leaks into another
+        await (supabase as any).rpc('upsert_verified_phone', {
+          p_phone: fullPhoneNumber,
+          p_code: storedCode,
+          p_tenant_id: currentTenantId
+        });
       } catch (error) {
         console.error('Error saving verified phone:', error);
       }

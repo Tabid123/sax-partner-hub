@@ -12,6 +12,7 @@ import { showBannerAd, hideBannerAd } from '@/services/admob';
 import { generateInvoiceImage } from '@/utils/invoiceGenerator';
 import { downloadBlobInBrowser } from '@/utils/downloadFile';
 import { useBrand } from '@/hooks/useBrand';
+import { useTenant } from '@/contexts/TenantContext';
 
 // Helper function to get invoice image - uses cached URL if available, otherwise generates on-demand
 const getInvoiceBlob = async (order: any): Promise<Blob> => {
@@ -69,7 +70,8 @@ const OrderHistory = () => {
         const orderChunks = await Promise.all(
           phonesToSearch.map(async (phone) => {
             const { data, error } = await (supabase as any).rpc('get_customer_order_history', {
-              customer_phone_number: phone
+              customer_phone_number: phone,
+              p_tenant_id: currentTenantId
             });
 
             if (error) throw error;
@@ -176,6 +178,7 @@ const OrderHistory = () => {
     }, (payload) => {
       // Check if the change is relevant to any of our phone numbers
       const order = payload.new as any;
+      if (order && currentTenantId && order.tenant_id !== currentTenantId) return;
       if (order && (
         phonesToListen.includes(normalizeSomaliPhone(order.customer_phone)) || 
         phonesToListen.includes(normalizeSomaliPhone(order.sender_phone))
@@ -186,7 +189,7 @@ const OrderHistory = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [toast]);
+  }, [toast, currentTenantId]);
   return <div className="min-h-screen bg-background pb-24">
       {/* Header with safe-area padding for Android 12+ */}
       <div style={{
