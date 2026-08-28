@@ -155,29 +155,57 @@ class UssdDialerService : Service() {
     
     /**
      * Android 14 (API 34) requires an explicit foreground service type that the app
-     * is actually allowed to use. "phoneCall" needs default-dialer/MANAGE_OWN_CALLS,
-     * so we start as dataSync|specialUse instead of crashing with SecurityException.
+     * is actually allowed to use. Android 15/16 additionally quota-limit dataSync and
+     * restrict background FGS starts, so we degrade gracefully instead of crashing.
      */
     private fun startForegroundCompat(notification: android.app.Notification) {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(
-                    NOTIFICATION_ID,
-                    notification,
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-                )
-            } else {
-                startForeground(NOTIFICATION_ID, notification)
+        val attempts: List<Pair<String, () -> Unit>> = buildList {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                add("specialUse|dataSync" to {
+                    startForeground(
+                        NOTIFICATION_ID,
+                        notification,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
+                            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                    )
+                })
+                add("specialUse" to {
+                    startForeground(
+                        NOTIFICATION_ID,
+                        notification,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                    )
+                })
             }
-        } catch (e: Exception) {
-            android.util.Log.e("UssdDialer", "❌ startForeground failed: ${e.message}")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                add("dataSync" to {
+                    startForeground(
+                        NOTIFICATION_ID,
+                        notification,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                    )
+                })
+            }
+            add("plain" to { startForeground(NOTIFICATION_ID, notification) })
+        }
+
+        for ((label, attempt) in attempts) {
             try {
-                startForeground(NOTIFICATION_ID, notification)
-            } catch (e2: Exception) {
-                android.util.Log.e("UssdDialer", "❌ startForeground fallback failed: ${e2.message}")
+                attempt()
+                android.util.Log.d("UssdDialer", "✅ Foreground started as $label")
+                return
+            } catch (e: Exception) {
+                android.util.Log.e("UssdDialer", "❌ startForeground($label) failed: ${e.javaClass.simpleName} ${e.message}")
             }
         }
+
+        // Every attempt refused (Android 14-16 background FGS restriction):
+        // fall back to WorkManager polling and shut down cleanly instead of being killed.
+        android.util.Log.e("UssdDialer", "🛟 Foreground service not allowed — switching to WorkManager fallback")
+        com.iftin.delivery.util.ServiceStarter.scheduleFallbackWork(applicationContext)
+        try { stopSelf() } catch (_: Exception) {}
     }
+
     
     
     /**
