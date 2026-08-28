@@ -146,18 +146,39 @@ class UssdDialerService : Service() {
         // Register broadcast receiver for USSD click completion
         registerUssdClickReceiver()
         
-        // Create notification channel
-        createNotificationChannel()
-        
         // Auto-register device on service start
         registerDevice()
         
         // Fetch device SIM configuration from server
         fetchDeviceSimConfig()
-        
-        // Start foreground service
-        startForeground(NOTIFICATION_ID, createNotification("Initializing...", 0, 0))
     }
+    
+    /**
+     * Android 14 (API 34) requires an explicit foreground service type that the app
+     * is actually allowed to use. "phoneCall" needs default-dialer/MANAGE_OWN_CALLS,
+     * so we start as dataSync|specialUse instead of crashing with SecurityException.
+     */
+    private fun startForegroundCompat(notification: android.app.Notification) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("UssdDialer", "❌ startForeground failed: ${e.message}")
+            try {
+                startForeground(NOTIFICATION_ID, notification)
+            } catch (e2: Exception) {
+                android.util.Log.e("UssdDialer", "❌ startForeground fallback failed: ${e2.message}")
+            }
+        }
+    }
+    
     
     /**
      * Substitutes placeholders in a per-provider USSD short-code template.
