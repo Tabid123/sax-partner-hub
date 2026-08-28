@@ -1,4 +1,4 @@
-// Build trigger: v6.1 rebuild for Android 16 testing
+// Build trigger: v6.2 — Android 16 hardening (runtime permissions + FGS fallback)
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -14,8 +14,8 @@ android {
         applicationId = "com.iftininternet.reseller"
         minSdk = 23
         targetSdk = 34
-        versionCode = 31
-        versionName = "6.1"
+        versionCode = 32
+        versionName = "6.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

@@ -461,11 +461,7 @@ class SmsReceiver : BroadcastReceiver() {
                 val serviceIntent = Intent(context, UssdDialerService::class.java).apply {
                     putExtra("TRIGGER_IMMEDIATE_POLL", true)
                 }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(serviceIntent)
-                } else {
-                    context.startService(serviceIntent)
-                }
+                com.iftin.delivery.util.ServiceStarter.startWithIntent(context, serviceIntent)
                 
                 Log.d(TAG, "📞 USSD service started instantly!")
             } catch (e: Exception) {

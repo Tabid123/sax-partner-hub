@@ -39,22 +39,38 @@ class HeartbeatAlarmReceiver : BroadcastReceiver() {
             )
             
             val triggerAt = System.currentTimeMillis() + HEARTBEAT_INTERVAL_MS
-            
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerAt,
-                    pendingIntent
-                )
-            } else {
-                alarmManager.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerAt,
-                    pendingIntent
-                )
+
+            try {
+                val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                    alarmManager.canScheduleExactAlarms()
+
+                when {
+                    canExact && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ->
+                        alarmManager.setExactAndAllowWhileIdle(
+                            AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent
+                        )
+                    canExact ->
+                        alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> {
+                        // Exact alarms denied on Android 12+ — inexact still keeps pings alive.
+                        alarmManager.setAndAllowWhileIdle(
+                            AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent
+                        )
+                        android.util.Log.w(TAG, "⚠️ Exact alarms denied — using inexact heartbeat")
+                    }
+                    else -> alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+                }
+            } catch (e: SecurityException) {
+                android.util.Log.e(TAG, "❌ Alarm scheduling denied: ${e.message}")
+                try {
+                    alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+                } catch (e2: Exception) {
+                    android.util.Log.e(TAG, "❌ Fallback alarm failed: ${e2.message}")
+                }
             }
-            
+
             android.util.Log.d(TAG, "⏰ Heartbeat alarm scheduled in ${HEARTBEAT_INTERVAL_MS / 1000}s")
+
         }
         
         /**

@@ -122,22 +122,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestPermissions() {
-        val permissions = mutableListOf(
-            Manifest.permission.CALL_PHONE,
-            Manifest.permission.READ_PHONE_STATE,
-            Manifest.permission.READ_PHONE_NUMBERS,
-            Manifest.permission.INTERNET,
-            Manifest.permission.ACCESS_NETWORK_STATE,
-            Manifest.permission.WAKE_LOCK,
-            Manifest.permission.FOREGROUND_SERVICE,
-            Manifest.permission.RECEIVE_SMS,
-            Manifest.permission.READ_SMS,
-            Manifest.permission.SEND_SMS  // OTP SMS sending permission
-        )
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-        }
+        val permissions = com.iftin.delivery.util.ServiceStarter.REQUIRED_PERMISSIONS.toMutableList()
 
         val permissionsToRequest = permissions.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
@@ -149,8 +134,72 @@ class MainActivity : ComponentActivity() {
                 permissionsToRequest.toTypedArray(),
                 PERMISSION_REQUEST_CODE
             )
+        } else {
+            ensureExactAlarmPermission()
         }
     }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != PERMISSION_REQUEST_CODE) return
+
+        val denied = permissions.filterIndexed { i, _ ->
+            grantResults.getOrNull(i) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (denied.isNotEmpty()) {
+            android.util.Log.w("MainActivity", "⚠️ Permissions denied: $denied")
+            val critical = denied.filter {
+                it == Manifest.permission.CALL_PHONE ||
+                    it == Manifest.permission.READ_PHONE_STATE ||
+                    it == Manifest.permission.READ_SMS ||
+                    it == Manifest.permission.RECEIVE_SMS
+            }
+            if (critical.isNotEmpty()) {
+                AlertDialog.Builder(this)
+                    .setTitle("⚠️ Ogolaansho la'aan")
+                    .setMessage(
+                        "Si dalabyada loo gudbiyo, app-ku wuxuu u baahan yahay ogolaanshaha " +
+                        "wicitaanka iyo SMS-ka. Fadlan ka fur Settings > Permissions."
+                    )
+                    .setPositiveButton("Settings") { _, _ ->
+                        startActivity(
+                            Intent(
+                                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                Uri.parse("package:$packageName")
+                            )
+                        )
+                    }
+                    .setNegativeButton("Ka gudub", null)
+                    .show()
+            }
+        }
+
+        ensureExactAlarmPermission()
+        // Service may have been started before permissions existed — refresh it now.
+        startDeliveryService()
+    }
+
+    /**
+     * Android 12+ (and enforced harder on 14/15/16): exact alarms used by the
+     * heartbeat require explicit user approval. Ask once, never crash.
+     */
+    private fun ensureExactAlarmPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        try {
+            val am = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+            if (!am.canScheduleExactAlarms()) {
+                startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("MainActivity", "Exact alarm settings unavailable: ${e.message}")
+        }
+    }
+
 
     private fun requestBatteryOptimization() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -213,11 +262,7 @@ class MainActivity : ComponentActivity() {
     private fun startDeliveryService() {
         try {
             val intent = Intent(this, UssdDialerService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
-            }
+            com.iftin.delivery.util.ServiceStarter.startWithIntent(this, intent)
         } catch (e: Exception) {
             android.util.Log.e("MainActivity", "Failed to start service: ${e.message}")
         }
