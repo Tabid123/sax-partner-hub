@@ -22,11 +22,15 @@ class IftinDeliveryApp : Application() {
         // Start USSD service automatically when app starts
         // This ensures the service is always running
         // SMS inbox polling now runs INSIDE UssdDialerService (24/7)
-        val serviceIntent = Intent(this, UssdDialerService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent)
-        } else {
-            startService(serviceIntent)
+        try {
+            val serviceIntent = Intent(this, UssdDialerService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("IftinApp", "⚠️ Service start blocked (background start limit): ${e.message}")
         }
         
         android.util.Log.d("IftinApp", "✅ App started - UssdDialerService launched (with SMS inbox polling)")

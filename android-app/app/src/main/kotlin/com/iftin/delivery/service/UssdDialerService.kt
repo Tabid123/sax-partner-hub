@@ -2335,11 +2335,16 @@ class UssdDialerService : Service() {
         android.util.Log.d("UssdDialer", "🔄 Task removed - restarting service immediately")
         
         // Immediate restart instead of AlarmManager (more reliable on Android 12+)
-        val restartIntent = Intent(applicationContext, UssdDialerService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            applicationContext.startForegroundService(restartIntent)
-        } else {
-            applicationContext.startService(restartIntent)
+        // Android 12+ throws ForegroundServiceStartNotAllowedException from background.
+        try {
+            val restartIntent = Intent(applicationContext, UssdDialerService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                applicationContext.startForegroundService(restartIntent)
+            } else {
+                applicationContext.startService(restartIntent)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("UssdDialer", "⚠️ Restart blocked by OS: ${e.message}")
         }
     }
     
@@ -2369,12 +2374,16 @@ class UssdDialerService : Service() {
         // Re-schedule heartbeat alarm (survives service restart)
         HeartbeatAlarmReceiver.scheduleHeartbeat(applicationContext)
         
-        // Immediately restart service to keep it running
-        val restartIntent = Intent(applicationContext, UssdDialerService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            applicationContext.startForegroundService(restartIntent)
-        } else {
-            applicationContext.startService(restartIntent)
+        // Immediately restart service to keep it running (guarded on Android 12+)
+        try {
+            val restartIntent = Intent(applicationContext, UssdDialerService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                applicationContext.startForegroundService(restartIntent)
+            } else {
+                applicationContext.startService(restartIntent)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("UssdDialer", "⚠️ Restart blocked by OS: ${e.message}")
         }
     }
 
