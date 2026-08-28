@@ -1,4 +1,4 @@
-// Build trigger: v6.0 fix Android 14+ crash on launch (FGS type + guarded starts)
+// Build trigger: v6.1 rebuild for Android 16 testing
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -14,8 +14,8 @@ android {
         applicationId = "com.iftininternet.reseller"
         minSdk = 23
         targetSdk = 34
-        versionCode = 30
-        versionName = "6.0"
+        versionCode = 31
+        versionName = "6.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
