@@ -113,6 +113,12 @@ class UssdDialerService : Service() {
             serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
         }
         
+        // Android 14+: startForeground MUST happen immediately (within 5s) and with
+        // an allowed service type, otherwise the app is killed on launch.
+        createNotificationChannel()
+        startForegroundCompat(createNotification("Initializing...", 0, 0))
+        
+        
         // Acquire wake lock with 24-hour timeout to keep CPU running when screen is off
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
