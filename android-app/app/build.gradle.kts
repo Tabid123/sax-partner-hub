@@ -1,4 +1,4 @@
-// Build trigger: v6.0 fix Android 14+ crash on launch (FGS type + guarded starts)
+// Build trigger: v6.1 rebuild for Android 16 testing
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
