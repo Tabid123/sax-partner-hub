@@ -94,6 +94,11 @@ export function resolveJumloDispatch(
     };
   }
 
+  // Last resort: any usable enabled flow wins, whatever the method string says.
+  if (flow?.is_enabled && flow.trigger_code) {
+    return { ussd_code: flow.trigger_code, delivery_status: 'queued', delivery_notes: null };
+  }
+
   return {
     ussd_code: null,
     delivery_status: 'failed',
