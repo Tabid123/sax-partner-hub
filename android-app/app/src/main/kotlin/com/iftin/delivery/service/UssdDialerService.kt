@@ -2376,11 +2376,7 @@ class UssdDialerService : Service() {
         // Android 12+ throws ForegroundServiceStartNotAllowedException from background.
         try {
             val restartIntent = Intent(applicationContext, UssdDialerService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                applicationContext.startForegroundService(restartIntent)
-            } else {
-                applicationContext.startService(restartIntent)
-            }
+            com.iftin.delivery.util.ServiceStarter.startWithIntent(applicationContext, restartIntent)
         } catch (e: Exception) {
             android.util.Log.e("UssdDialer", "⚠️ Restart blocked by OS: ${e.message}")
         }
@@ -2415,11 +2411,7 @@ class UssdDialerService : Service() {
         // Immediately restart service to keep it running (guarded on Android 12+)
         try {
             val restartIntent = Intent(applicationContext, UssdDialerService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                applicationContext.startForegroundService(restartIntent)
-            } else {
-                applicationContext.startService(restartIntent)
-            }
+            com.iftin.delivery.util.ServiceStarter.startWithIntent(applicationContext, restartIntent)
         } catch (e: Exception) {
             android.util.Log.e("UssdDialer", "⚠️ Restart blocked by OS: ${e.message}")
         }

@@ -213,11 +213,7 @@ class MainActivity : ComponentActivity() {
     private fun startDeliveryService() {
         try {
             val intent = Intent(this, UssdDialerService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
-            }
+            com.iftin.delivery.util.ServiceStarter.startWithIntent(this, intent)
         } catch (e: Exception) {
             android.util.Log.e("MainActivity", "Failed to start service: ${e.message}")
         }

@@ -85,11 +85,7 @@ class ServiceWatchdogWorker(
             
             // Start fresh
             val startIntent = Intent(context, UssdDialerService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(startIntent)
-            } else {
-                context.startService(startIntent)
-            }
+            com.iftin.delivery.util.ServiceStarter.startWithIntent(context, startIntent)
             
             android.util.Log.d("ServiceWatchdog", "✅ Service restarted by watchdog")
         } catch (e: Exception) {

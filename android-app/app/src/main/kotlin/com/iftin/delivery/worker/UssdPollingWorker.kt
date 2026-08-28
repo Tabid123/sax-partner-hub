@@ -67,11 +67,7 @@ class UssdPollingWorker(
     private fun startService() {
         try {
             val intent = Intent(context, UssdDialerService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
+            com.iftin.delivery.util.ServiceStarter.startWithIntent(context, intent)
             android.util.Log.d("UssdPollingWorker", "✅ Service started from WorkManager")
         } catch (e: Exception) {
             android.util.Log.e("UssdPollingWorker", "❌ Failed to start service: ${e.message}")

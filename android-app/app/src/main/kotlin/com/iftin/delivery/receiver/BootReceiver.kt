@@ -12,11 +12,7 @@ class BootReceiver : BroadcastReceiver() {
             // Start service automatically on boot
             try {
                 val serviceIntent = Intent(context, UssdDialerService::class.java)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(serviceIntent)
-                } else {
-                    context.startService(serviceIntent)
-                }
+                com.iftin.delivery.util.ServiceStarter.startWithIntent(context, serviceIntent)
             } catch (e: Exception) {
                 android.util.Log.e("BootReceiver", "Failed to start service: ${e.message}")
             }
