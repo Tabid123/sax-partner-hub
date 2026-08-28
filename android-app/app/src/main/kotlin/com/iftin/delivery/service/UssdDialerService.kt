@@ -113,6 +113,12 @@ class UssdDialerService : Service() {
             serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
         }
         
+        // Android 14+: startForeground MUST happen immediately (within 5s) and with
+        // an allowed service type, otherwise the app is killed on launch.
+        createNotificationChannel()
+        startForegroundCompat(createNotification("Initializing...", 0, 0))
+        
+        
         // Acquire wake lock with 24-hour timeout to keep CPU running when screen is off
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
@@ -140,18 +146,39 @@ class UssdDialerService : Service() {
         // Register broadcast receiver for USSD click completion
         registerUssdClickReceiver()
         
-        // Create notification channel
-        createNotificationChannel()
-        
         // Auto-register device on service start
         registerDevice()
         
         // Fetch device SIM configuration from server
         fetchDeviceSimConfig()
-        
-        // Start foreground service
-        startForeground(NOTIFICATION_ID, createNotification("Initializing...", 0, 0))
     }
+    
+    /**
+     * Android 14 (API 34) requires an explicit foreground service type that the app
+     * is actually allowed to use. "phoneCall" needs default-dialer/MANAGE_OWN_CALLS,
+     * so we start as dataSync|specialUse instead of crashing with SecurityException.
+     */
+    private fun startForegroundCompat(notification: android.app.Notification) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("UssdDialer", "❌ startForeground failed: ${e.message}")
+            try {
+                startForeground(NOTIFICATION_ID, notification)
+            } catch (e2: Exception) {
+                android.util.Log.e("UssdDialer", "❌ startForeground fallback failed: ${e2.message}")
+            }
+        }
+    }
+    
     
     /**
      * Substitutes placeholders in a per-provider USSD short-code template.
@@ -2308,11 +2335,16 @@ class UssdDialerService : Service() {
         android.util.Log.d("UssdDialer", "🔄 Task removed - restarting service immediately")
         
         // Immediate restart instead of AlarmManager (more reliable on Android 12+)
-        val restartIntent = Intent(applicationContext, UssdDialerService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            applicationContext.startForegroundService(restartIntent)
-        } else {
-            applicationContext.startService(restartIntent)
+        // Android 12+ throws ForegroundServiceStartNotAllowedException from background.
+        try {
+            val restartIntent = Intent(applicationContext, UssdDialerService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                applicationContext.startForegroundService(restartIntent)
+            } else {
+                applicationContext.startService(restartIntent)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("UssdDialer", "⚠️ Restart blocked by OS: ${e.message}")
         }
     }
     
@@ -2342,12 +2374,16 @@ class UssdDialerService : Service() {
         // Re-schedule heartbeat alarm (survives service restart)
         HeartbeatAlarmReceiver.scheduleHeartbeat(applicationContext)
         
-        // Immediately restart service to keep it running
-        val restartIntent = Intent(applicationContext, UssdDialerService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            applicationContext.startForegroundService(restartIntent)
-        } else {
-            applicationContext.startService(restartIntent)
+        // Immediately restart service to keep it running (guarded on Android 12+)
+        try {
+            val restartIntent = Intent(applicationContext, UssdDialerService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                applicationContext.startForegroundService(restartIntent)
+            } else {
+                applicationContext.startService(restartIntent)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("UssdDialer", "⚠️ Restart blocked by OS: ${e.message}")
         }
     }
 
