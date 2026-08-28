@@ -2317,10 +2317,20 @@ class UssdDialerService : Service() {
     }
 
     private fun updateNotification(text: String, successful: Int, failed: Int) {
-        val notification = createNotification(text, successful, failed)
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(NOTIFICATION_ID, notification)
+        // Android 13+: posting without POST_NOTIFICATIONS throws / is dropped.
+        if (!com.iftin.delivery.util.ServiceStarter.canPostNotifications(this)) {
+            android.util.Log.d("UssdDialer", "🔕 POST_NOTIFICATIONS denied — skipping notification update")
+            return
+        }
+        try {
+            val notification = createNotification(text, successful, failed)
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.notify(NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            android.util.Log.e("UssdDialer", "❌ Notification update failed: ${e.message}")
+        }
     }
+
 
     private fun createNotification(text: String, successful: Int, failed: Int): Notification {
         val intent = Intent(this, MainActivity::class.java)
