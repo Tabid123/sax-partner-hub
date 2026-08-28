@@ -1,4 +1,4 @@
-// Build trigger: v5.9 fix release crash on launch (disable R8 shrinking)
+// Build trigger: v6.0 fix Android 14+ crash on launch (FGS type + guarded starts)
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -14,8 +14,8 @@ android {
         applicationId = "com.iftininternet.reseller"
         minSdk = 23
         targetSdk = 34
-        versionCode = 29
-        versionName = "5.9"
+        versionCode = 30
+        versionName = "6.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
