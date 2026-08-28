@@ -73,9 +73,13 @@ object ServiceStarter {
      * If the OS refuses (background start / FGS restrictions on Android 14-16),
      * we silently degrade to WorkManager-driven polling.
      */
-    fun start(context: Context, reason: String = "unknown"): Boolean {
+    fun start(context: Context, reason: String = "unknown"): Boolean =
+        startWithIntent(context, Intent(context.applicationContext, UssdDialerService::class.java), reason)
+
+    /** Same as [start] but keeps extras supplied by the caller. */
+    fun startWithIntent(context: Context, intent: Intent, reason: String = "unknown"): Boolean {
         val appContext = context.applicationContext
-        val intent = Intent(appContext, UssdDialerService::class.java)
+
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 appContext.startForegroundService(intent)
