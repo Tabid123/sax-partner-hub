@@ -707,11 +707,19 @@ class UssdAccessibilityService : AccessibilityService() {
     }
 
     private fun isAmountCommittedInActiveField(root: AccessibilityNodeInfo, expected: String): Boolean {
-        if (isValueCommittedInActiveField(root, expected)) return true
+        // MONEY SAFETY: never accept masked/length-based matches for the amount.
+        // The visible field must parse to EXACTLY the expected number, otherwise
+        // we would risk sending a different amount than the customer paid for.
         val actual = readActiveEditableFieldText(root)
+        if (actual.isBlank()) return false
+        if (actual.trim() == expected.trim()) return true
         val actualNumber = parseDecimalValue(actual) ?: return false
         val expectedNumber = parseDecimalValue(expected) ?: return false
-        return kotlin.math.abs(actualNumber - expectedNumber) < 0.000001
+        val ok = kotlin.math.abs(actualNumber - expectedNumber) < 0.000001
+        if (!ok) {
+            Log.e(TAG, "🛑 AMOUNT mismatch — field='$actual' expected='$expected'; Send blocked")
+        }
+        return ok
     }
 
     private fun isReceiverCommittedInActiveField(root: AccessibilityNodeInfo, expected: String): Boolean {
