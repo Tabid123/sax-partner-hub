@@ -230,10 +230,8 @@ async function queueDeliveryWithBundling(
 // ============================================================
 const TENANT_TABLES = new Set([
   'orders', 'payment_receipts', 'delivery_queue', 'pending_online_payments',
-  'providers_config', 'data_packages_config', 'package_categories',
-  'payment_providers_config', 'delivery_instructions', 'package_delivery_rules',
-  'provider_wholesale_tiers', 'auto_topup_numbers', 'offline_registrations',
-  'blocked_users', 'ussd_flows', 'ussd_flow_steps', 'android_devices',
+  'payment_providers_config', 'provider_wholesale_tiers', 'auto_topup_numbers',
+  'offline_registrations', 'blocked_users', 'android_devices',
   'discount_codes', 'customer_discounts', 'featured_packages', 'notifications',
 ]);
 
@@ -815,7 +813,10 @@ serve(async (req) => {
         // BRANCH: JUMLO (wholesale top-up via multi-step USSD flow)
         // ============================================================
         if (pendingOnline.intent_type === 'jumlo') {
-          const { data: providerData } = await supabase
+          // Providers and their USSD configuration are system-wide. Never apply
+          // a tenant_id filter here: tenants only enable providers through
+          // tenant_providers; they do not own provider or flow definitions.
+          const { data: providerData } = await rootClient
             .from('providers_config')
             .select('provider_name, ussd_method, ussd_flow_id, ussd_single_template')
             .eq('id', pendingOnline.provider_id)
@@ -824,7 +825,7 @@ serve(async (req) => {
           // Resolve USSD flow row when provider uses multi_step
           let flowRow: { trigger_code: string; is_enabled: boolean } | null = null;
           if (providerData?.ussd_flow_id) {
-            const { data: f } = await supabase
+            const { data: f } = await rootClient
               .from('ussd_flows')
               .select('trigger_code, is_enabled')
               .eq('id', providerData.ussd_flow_id)
@@ -863,7 +864,7 @@ serve(async (req) => {
 
           // Fetch sim_password from delivery_instructions for this provider (provider default)
           let jumloPin = '5516';
-          const { data: provInstr } = await supabase
+          const { data: provInstr } = await rootClient
             .from('delivery_instructions')
             .select('sim_password')
             .eq('provider_id', pendingOnline.provider_id)
